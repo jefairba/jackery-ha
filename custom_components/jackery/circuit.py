@@ -244,6 +244,35 @@ class JackeryCircuitSwitch(CoordinatorEntity, SwitchEntity):
             attrs["combined"] = True
         return attrs
 
+    async def _async_restore_legs(
+        self, legs: list[int], previous: dict[int, object]
+    ) -> str:
+        """Return each leg to its previous state; describe the outcome."""
+        restored, failed = [], []
+        for idx in legs:
+            if previous.get(idx) is None:
+                failed.append(f"leg {idx} (previous state unknown)")
+                continue
+            try:
+                await self._api.async_set_circuit_switch(
+                    self._device_id, self._device_sn, idx, previous[idx] == 1
+                )
+                restored.append(f"leg {idx}")
+            except Exception as err:  # noqa: BLE001 - report every leg
+                failed.append(f"leg {idx} ({err})")
+        if failed:
+            _LOGGER.error(
+                "Circuit %s may be split across legs: restore failed for %s",
+                self._circuit_name,
+                ", ".join(failed),
+            )
+            return (
+                "WARNING: 240V circuit may be on only one leg - could not "
+                f"restore {', '.join(failed)}"
+                + (f"; restored {', '.join(restored)}" if restored else "")
+            )
+        return f"restored {', '.join(restored)} to previous state"
+
     async def async_turn_on(self, **kwargs) -> None:
         await self._async_set_switch(True)
 
@@ -251,8 +280,16 @@ class JackeryCircuitSwitch(CoordinatorEntity, SwitchEntity):
         await self._async_set_switch(False)
 
     async def _async_set_switch(self, on: bool) -> None:
+        action = "enable" if on else "disable"
+        previous = {
+            c.get("idx"): c.get("sw")
+            for c in _get_circuits(self.coordinator)
+            if c.get("idx") in self._indices
+        }
+        attempted: list[int] = []
         try:
             for idx in self._indices:
+                attempted.append(idx)
                 await self._api.async_set_circuit_switch(
                     self._device_id,
                     self._device_sn,
@@ -260,9 +297,16 @@ class JackeryCircuitSwitch(CoordinatorEntity, SwitchEntity):
                     on,
                 )
         except Exception as err:
+            detail = str(err)
+            if len(self._indices) > 1:
+                # A 240V circuit is two legs switched one at a time. If a leg
+                # failed after another switched, the load would be left on one
+                # leg. Put every leg we touched (including the failed one,
+                # which may have applied anyway) back to its previous state.
+                detail += "; " + await self._async_restore_legs(attempted, previous)
+            await self.coordinator.async_request_refresh()
             raise HomeAssistantError(
-                f"Failed to {'enable' if on else 'disable'} circuit "
-                f"{self._circuit_name}: {err}"
+                f"Failed to {action} circuit {self._circuit_name}: {detail}"
             ) from err
 
         # Optimistic update
