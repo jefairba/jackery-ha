@@ -11,7 +11,7 @@ Not affiliated with or endorsed by Jackery. "Jackery" is a trademark of its owne
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![fork](https://img.shields.io/badge/personal%20fork-%40jefairba-lightgrey.svg)](https://github.com/jefairba/jackery-ha)
-[![version](https://img.shields.io/badge/version-1.2.0--jf.6-blue.svg)](https://github.com/jefairba/jackery-ha)
+[![version](https://img.shields.io/badge/version-1.2.0--jf.7-blue.svg)](https://github.com/jefairba/jackery-ha)
 
 Custom Home Assistant integration for monitoring and controlling Jackery portable power stations and the Smart Transfer Switch. Provides real-time sensors, writable controls, and automation services.
 

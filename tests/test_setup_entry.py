@@ -651,6 +651,29 @@ class TransferSwitchCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             api.JackeryAPI.async_query_transfer_switch_plans = original_query
         self.assertEqual([p["pid"] for p in data["_plans"]], ["p1"])
 
+    async def test_missing_circuits_are_requeried_every_poll(self) -> None:
+        """If the startup circuit query got nothing, retry on the next poll.
+
+        Seen 2026-09-26: the startup query timed out and circuits stayed
+        unavailable until the every-10th-poll query.
+        """
+        api.JackeryAPI.circuits_result = []
+        coordinator = await self._setup_ts()
+        calls = len(api.JackeryAPI.circuits_query_calls)
+
+        api.JackeryAPI.circuits_result = [
+            {"idx": 1, "nm": "T2ZmaWNl", "pc": 100, "sw": 1, "sph": 0, "pr": 1}
+        ]
+        data = await coordinator.update_method()
+
+        self.assertEqual(len(api.JackeryAPI.circuits_query_calls), calls + 1)
+        self.assertEqual(len(data["_circuits"]), 1)
+
+        # Once circuits are known, back to the normal cadence.
+        calls = len(api.JackeryAPI.circuits_query_calls)
+        await coordinator.update_method()
+        self.assertEqual(len(api.JackeryAPI.circuits_query_calls), calls)
+
     async def test_circuit_cache_preserved_when_query_returns_empty(self) -> None:
         """An empty circuit-query response must not wipe the cached circuit list."""
         api.JackeryAPI.circuits_result = [

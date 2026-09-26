@@ -201,7 +201,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                             )
 
                     _cir_counter[0] += 1
-                    if _cir_counter[0] >= CIRCUIT_QUERY_EVERY_N:
+                    # With no circuit data yet (e.g. the startup query timed out),
+                    # ask every poll instead of every 10th, or circuits and the
+                    # kWh helpers built on them stay unavailable for ~10 min.
+                    if _cir_counter[0] >= CIRCUIT_QUERY_EVERY_N or not _circuit_cache["circuits"]:
                         _cir_counter[0] = 0
                         try:
                             circuits = await api_client.async_query_transfer_switch_circuits(dev_sn)
