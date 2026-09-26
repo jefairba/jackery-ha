@@ -157,6 +157,7 @@ def install_dependency_stubs(stubbed_modules: dict[str, object]) -> None:
     class Platform:
         """Stub platform enum."""
 
+        BUTTON = "button"
         SENSOR = "sensor"
         BINARY_SENSOR = "binary_sensor"
         SWITCH = "switch"
@@ -204,6 +205,8 @@ def install_package_stubs(stubbed_modules: dict[str, object]) -> None:
     const_mod = types.ModuleType(f"{TEST_PACKAGE}.const")
     const_mod.DOMAIN = "jackery"
     const_mod.CONF_ANDROID_ID = "android_id"
+    const_mod.CONF_YIELD_MINUTES = "yield_minutes"
+    const_mod.DEFAULT_YIELD_MINUTES = 15
     const_mod.POLLING_INTERVAL_SEC = 60
     const_mod.SENSOR_DESCRIPTIONS = ()
     const_mod.BINARY_SENSOR_DESCRIPTIONS = ()
@@ -739,8 +742,9 @@ class HttpSessionTests(unittest.TestCase):
         self.assertEqual(result["data"]["rb"], 85)
 
     def test_get_request_relogins_and_retries_on_10403(self) -> None:
-        """10403 (session displaced) must be handled identically to 10402."""
+        """With yielding disabled, 10403 is handled identically to 10402."""
         jackery_api = api.JackeryAPI("user@example.com", "password")
+        jackery_api.yield_seconds = 0
         jackery_api._token = "old-token"
 
         api.requests.get = unittest.mock.Mock(side_effect=[
@@ -767,6 +771,7 @@ class HttpSessionTests(unittest.TestCase):
     def test_get_request_raises_auth_error_when_relogin_fails(self) -> None:
         """If re-login fails after 10402/10403, JackeryAuthenticationError must be raised."""
         jackery_api = api.JackeryAPI("user@example.com", "password")
+        jackery_api.yield_seconds = 0
         jackery_api._token = "old-token"
 
         api.requests.get = unittest.mock.Mock(

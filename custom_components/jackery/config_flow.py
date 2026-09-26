@@ -9,7 +9,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 
 from .api import (
     JackeryAPI,
@@ -17,7 +17,12 @@ from .api import (
     JackeryConnectionError,
     new_android_id,
 )
-from .const import CONF_ANDROID_ID, DOMAIN
+from .const import (
+    CONF_ANDROID_ID,
+    CONF_YIELD_MINUTES,
+    DEFAULT_YIELD_MINUTES,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,6 +56,12 @@ class JackeryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Jackery."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Options live under Settings > Devices & services > Jackery > Configure."""
+        return JackeryOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step."""
@@ -114,3 +125,30 @@ class JackeryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={"username": entry.data[CONF_USERNAME]},
             errors=errors,
         )
+
+
+# Reload the entry when options change (HA >= 2025.8); plain OptionsFlow on
+# older cores, where a manual reload applies the new value.
+_OptionsFlowBase = getattr(
+    config_entries, "OptionsFlowWithReload", config_entries.OptionsFlow
+)
+
+
+class JackeryOptionsFlow(_OptionsFlowBase):
+    """Tune how HA shares the one-login-per-account Jackery session."""
+
+    async def async_step_init(self, user_input=None):
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        current = self.config_entry.options.get(
+            CONF_YIELD_MINUTES, DEFAULT_YIELD_MINUTES
+        )
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_YIELD_MINUTES, default=current): vol.All(
+                    vol.Coerce(int), vol.Range(min=0, max=240)
+                ),
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)

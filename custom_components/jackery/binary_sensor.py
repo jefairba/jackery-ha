@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import DOMAIN, BINARY_SENSOR_DESCRIPTIONS, ENTITY_HELP_TEXT
 from .protocol import is_supported_property
+from .session import SCAN_INTERVAL, JackeryYieldingSensor  # noqa: F401 - HA reads SCAN_INTERVAL
 
 
 async def async_setup_entry(
@@ -44,6 +45,7 @@ async def async_setup_entry(
                         JackeryBinarySensor(coordinator, description, device)
                     )
 
+    entities.append(JackeryYieldingSensor(entry_data["api"], config_entry.entry_id))
     async_add_entities(entities)
 
     def _build_binary_sensor_listener(

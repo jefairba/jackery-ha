@@ -27,6 +27,8 @@ from homeassistant.const import (
 # The domain of your integration. Should be unique.
 DOMAIN = "jackery"
 CONF_ANDROID_ID = "android_id"
+CONF_YIELD_MINUTES = "yield_minutes"
+DEFAULT_YIELD_MINUTES = 15
 
 # Polling interval
 POLLING_INTERVAL_SEC = 60

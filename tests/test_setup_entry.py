@@ -92,6 +92,7 @@ def install_homeassistant_stubs(stubbed_modules: dict[str, object]) -> None:
     class Platform:
         """Stub platform enum."""
 
+        BUTTON = "button"
         SENSOR = "sensor"
         BINARY_SENSOR = "binary_sensor"
         SWITCH = "switch"
@@ -164,6 +165,8 @@ def install_package_stubs(stubbed_modules: dict[str, object]) -> None:
     const_mod = types.ModuleType(f"{TEST_PACKAGE}.const")
     const_mod.DOMAIN = "jackery"
     const_mod.CONF_ANDROID_ID = "android_id"
+    const_mod.CONF_YIELD_MINUTES = "yield_minutes"
+    const_mod.DEFAULT_YIELD_MINUTES = 15
     const_mod.POLLING_INTERVAL_SEC = 60
     const_mod.SENSOR_DESCRIPTIONS = ()
     const_mod.BINARY_SENSOR_DESCRIPTIONS = ()
@@ -374,6 +377,24 @@ class AsyncSetupEntryTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(entry.data["android_id"], "feedfacecafebeef")
         self.assertEqual(api.JackeryAPI.instances[-1].android_id, "feedfacecafebeef")
+
+    async def test_setup_entry_applies_yield_option(self) -> None:
+        """The options-flow value (minutes) becomes the API's yield (seconds)."""
+        hass = self._make_hass()
+        entry = self._make_entry()
+        entry.options = {"yield_minutes": 0}
+
+        await integration.async_setup_entry(hass, entry)
+
+        self.assertEqual(api.JackeryAPI.instances[-1].yield_seconds, 0)
+
+    async def test_setup_entry_defaults_yield_to_15_minutes(self) -> None:
+        hass = self._make_hass()
+        entry = self._make_entry()
+
+        await integration.async_setup_entry(hass, entry)
+
+        self.assertEqual(api.JackeryAPI.instances[-1].yield_seconds, 900)
 
     async def test_setup_entry_succeeds_without_devices(self) -> None:
         """An empty account should stay loaded instead of failing setup outright."""

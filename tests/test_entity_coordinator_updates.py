@@ -67,6 +67,9 @@ def install_homeassistant_stubs(stubbed_modules: dict[str, object]) -> None:
     number_mod = ensure_module("homeassistant.components.number")
     sensor_mod = ensure_module("homeassistant.components.sensor")
     binary_sensor_mod = ensure_module("homeassistant.components.binary_sensor")
+    button_mod = ensure_module("homeassistant.components.button")
+    if not hasattr(button_mod, "ButtonEntity"):
+        button_mod.ButtonEntity = type("ButtonEntity", (), {})
     text_mod = ensure_module("homeassistant.components.text")
     config_entries_mod = ensure_module("homeassistant.config_entries")
     const_mod = ensure_module("homeassistant.const")
@@ -501,13 +504,31 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
         device = dict(self.device_info)
         entry_id = "entry-1"
 
+        session_entities: list[object] = []
+
+        class DeviceEntities(list):
+            """Collects device entities; account-level session entities
+            (no entity_description) are recorded separately."""
+
+            def extend(self, entities):
+                for entity in entities:
+                    if hasattr(entity, "entity_description"):
+                        self.append(entity)
+                    else:
+                        session_entities.append(entity)
+
         async def collect_entities(module, coordinator_data):
-            added: list[object] = []
+            added = DeviceEntities()
             coordinator = TrackingCoordinator(coordinator_data)
             hass = types.SimpleNamespace(
                 data={
                     "jackery": {
                         entry_id: {
+                            "api": types.SimpleNamespace(
+                                is_yielding=lambda: False,
+                                yield_remaining=lambda: 0.0,
+                                yield_seconds=900,
+                            ),
                             "coordinators": {"device-1": coordinator},
                             "devices": [device],
                         }
@@ -564,6 +585,10 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
 
         added, coordinator = await collect_entities(binary_sensor, {"oac": 1})
         self.assertEqual([entity.entity_description.key for entity in added], ["oac"])
+        self.assertEqual(
+            [type(entity).__name__ for entity in session_entities],
+            ["JackeryYieldingSensor"],
+        )
         coordinator.async_set_updated_data({"oac": 1, "ta": 0})
         self.assertEqual(
             [entity.entity_description.key for entity in added],
@@ -584,6 +609,11 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
             data={
                 "jackery": {
                     "entry-1": {
+                        "api": types.SimpleNamespace(
+                            is_yielding=lambda: False,
+                            yield_remaining=lambda: 0.0,
+                            yield_seconds=900,
+                        ),
                         "coordinators": {
                             "device-1": coordinator_one,
                             "device-2": coordinator_two,

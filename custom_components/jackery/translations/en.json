@@ -26,6 +26,17 @@
         "already_configured": "This Jackery account is already configured.",
         "reauth_successful": "Password updated. The Jackery integration is reloading."
       }
+    },
+    "options": {
+      "step": {
+        "init": {
+          "title": "Sharing the Jackery login",
+          "description": "Jackery allows one sign-in per account. When the Jackery app signs in, Home Assistant is signed out. Choose how long Home Assistant waits before signing back in (which signs the app out). Use the Reclaim Jackery Session button to sign back in sooner. 0 = never wait: Home Assistant signs straight back in.",
+          "data": {
+            "yield_minutes": "Minutes to stay signed out after the Jackery app takes over"
+          }
+        }
+      }
     }
 }
   

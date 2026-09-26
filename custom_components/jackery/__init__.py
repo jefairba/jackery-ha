@@ -18,10 +18,11 @@ from homeassistant.helpers.update_coordinator import (
 from homeassistant.util import dt as dt_util
 
 from .api import JackeryAPI, JackeryAuthenticationError, new_android_id
-from .const import BINARY_SENSOR_DESCRIPTIONS, CONF_ANDROID_ID, DOMAIN, POLLING_INTERVAL_SEC, SENSOR_DESCRIPTIONS
+from .const import BINARY_SENSOR_DESCRIPTIONS, CONF_ANDROID_ID, CONF_YIELD_MINUTES, DEFAULT_YIELD_MINUTES, DOMAIN, POLLING_INTERVAL_SEC, SENSOR_DESCRIPTIONS
 from .protocol import CONTROL_SPECS, is_transfer_switch_device
 
 PLATFORMS: list[Platform] = [
+    Platform.BUTTON,
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
     Platform.SWITCH,
@@ -53,6 +54,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         password=entry.data[CONF_PASSWORD],
         android_id=entry.data[CONF_ANDROID_ID],
     )
+    options = getattr(entry, "options", None) or {}
+    api.yield_seconds = 60 * options.get(CONF_YIELD_MINUTES, DEFAULT_YIELD_MINUTES)
 
     try:
         device_list_response = await hass.async_add_executor_job(api.get_device_list)

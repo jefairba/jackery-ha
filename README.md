@@ -13,6 +13,19 @@
 
 Custom Home Assistant integration for monitoring and controlling Jackery portable power stations and the Smart Transfer Switch. Provides real-time sensors, writable controls, and automation services.
 
+## What this fork changes
+
+Differences from [turmacar/jackery-homeassistant](https://github.com/turmacar/jackery-homeassistant):
+
+- **Credentials stay out of logs.** Tokens, the MQTT password, user ID, Wi-Fi name, LAN IP and MAC are masked; a failed login no longer logs the request URL (which carried the password in recoverable form).
+- **Network outages are not "wrong password".** If Jackery can't be reached (e.g. HA boots before the internet is back after a power cut), setup retries instead of waiting for reauthentication. A standard *Reauthenticate* screen handles real password changes.
+- **Per-install device identity** instead of one hardcoded ID shared by every install.
+- **Commands must be confirmed.** A switch/select/number only changes in HA when the device reports the new value within 10 s; otherwise HA shows *rejected* or *unconfirmed* and re-reads the real state.
+- **240V circuits are never left on one leg.** If either leg fails, both are returned to their previous state (with a loud warning if that fails too).
+- **Stale data is visible.** A *Data Stale* sensor turns on after ~2 min without fresh cloud data; entities go unavailable after ~5 min (was 15).
+- **Sharing the one Jackery login with the phone app.** Jackery allows one sign-in per account. When the app signs in, HA now steps aside for a configurable time (default 15 min; *Configure* on the integration) instead of immediately signing the app out. A *Yielding to Jackery App* sensor and a *Reclaim Jackery Session* button live on a *Jackery Cloud Session* device.
+- **Devices shared to the account are discovered** (Jackery app sharing). Whether a shared account can *control* a device is decided by Jackery and has not been verified.
+
 ## Features
 
 - Battery, power, and time-remaining sensors for portable power stations

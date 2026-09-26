@@ -32,6 +32,16 @@ class ConfigFlow:
         return {"type": "abort", "reason": "reauth_successful"}
 
 
+class OptionsFlow:
+    """Minimal stand-in for homeassistant.config_entries.OptionsFlow."""
+
+    def async_show_form(self, **kwargs):
+        return {"type": "form", **kwargs}
+
+    def async_create_entry(self, *, data):
+        return {"type": "create_entry", "data": data}
+
+
 class JackeryAuthenticationError(Exception):
     pass
 
@@ -68,9 +78,9 @@ def _load(stubbed: dict):
         install(name, module)
 
     stub("homeassistant")
-    stub("homeassistant.config_entries", ConfigFlow=ConfigFlow)
+    stub("homeassistant.config_entries", ConfigFlow=ConfigFlow, OptionsFlow=OptionsFlow)
     stub("homeassistant.const", CONF_PASSWORD="password", CONF_USERNAME="username")
-    stub("homeassistant.core", HomeAssistant=object)
+    stub("homeassistant.core", HomeAssistant=object, callback=lambda func: func)
     pkg = types.ModuleType(TEST_PACKAGE)
     pkg.__path__ = [str(PACKAGE_ROOT)]
     install(TEST_PACKAGE, pkg)
@@ -81,7 +91,13 @@ def _load(stubbed: dict):
         JackeryConnectionError=JackeryConnectionError,
         new_android_id=lambda: "0123456789abcdef",
     )
-    stub(f"{TEST_PACKAGE}.const", DOMAIN="jackery", CONF_ANDROID_ID="android_id")
+    stub(
+        f"{TEST_PACKAGE}.const",
+        DOMAIN="jackery",
+        CONF_ANDROID_ID="android_id",
+        CONF_YIELD_MINUTES="yield_minutes",
+        DEFAULT_YIELD_MINUTES=15,
+    )
 
     spec = importlib.util.spec_from_file_location(
         f"{TEST_PACKAGE}.config_flow", PACKAGE_ROOT / "config_flow.py"
@@ -156,12 +172,50 @@ class ReauthFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(self.flow, "updated"))
 
 
+class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._stubbed = {}
+        cls.flow_module = _load(cls._stubbed)
+
+    @classmethod
+    def tearDownClass(cls):
+        _restore(cls._stubbed)
+
+    def make_flow(self, options):
+        flow = self.flow_module.JackeryConfigFlow.async_get_options_flow(None)
+        flow.config_entry = types.SimpleNamespace(options=options)
+        return flow
+
+    async def test_form_defaults_to_15_minutes(self):
+        result = await self.make_flow({}).async_step_init()
+        self.assertEqual(result["step_id"], "init")
+        self.assertEqual(result["data_schema"]({})["yield_minutes"], 15)
+
+    async def test_form_shows_saved_value(self):
+        result = await self.make_flow({"yield_minutes": 45}).async_step_init()
+        self.assertEqual(result["data_schema"]({})["yield_minutes"], 45)
+
+    async def test_saves_choice(self):
+        result = await self.make_flow({}).async_step_init({"yield_minutes": 0})
+        self.assertEqual(result, {"type": "create_entry", "data": {"yield_minutes": 0}})
+
+    async def test_rejects_out_of_range(self):
+        result = await self.make_flow({}).async_step_init()
+        with self.assertRaises(Exception):
+            result["data_schema"]({"yield_minutes": 500})
+
+
 class TranslationTests(unittest.TestCase):
     def test_reauth_strings_exist(self):
         strings = json.loads((PACKAGE_ROOT / "translations" / "en.json").read_text())
         self.assertIn("reauth_confirm", strings["config"]["step"])
         self.assertIn("{username}", strings["config"]["step"]["reauth_confirm"]["description"])
         self.assertIn("reauth_successful", strings["config"]["abort"])
+
+    def test_options_strings_exist(self):
+        strings = json.loads((PACKAGE_ROOT / "translations" / "en.json").read_text())
+        self.assertIn("yield_minutes", strings["options"]["step"]["init"]["data"])
 
 
 if __name__ == "__main__":

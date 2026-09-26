@@ -123,16 +123,41 @@ class JackeryMqttSession:
             self._loop_task = None
         self._fail_pending(RuntimeError("MQTT session stopped"))
 
+    async def _wait_out_yield(self) -> None:
+        """Sleep while HA is yielding the account to the phone app.
+
+        The MQTT client ID is ``{userId}@APP`` - the same one the phone app
+        uses - so merely reconnecting would kick the app off. Checks every few
+        seconds so 'Reclaim Jackery Session' takes effect promptly.
+        """
+        while self._running and self._api.is_yielding():
+            await asyncio.sleep(min(5.0, max(0.5, self._api.yield_remaining())))
+
     async def _run_loop(self) -> None:
         """Reconnect loop - runs until stop() is called."""
+        check_session_first = False
         while self._running:
             try:
+                await self._wait_out_yield()
+                if not self._running:
+                    return
+                if check_session_first:
+                    # A dropped connection often means the phone app just
+                    # logged in. Ask the HTTP API (cheap) before reconnecting;
+                    # on 10403 this starts a yield instead of a tug-of-war.
+                    try:
+                        await asyncio.to_thread(self._api.check_session)
+                    except JackerySessionYielded:
+                        continue
+                    except Exception as err:  # noqa: BLE001 - network trouble
+                        _LOGGER.debug("Session check before reconnect failed: %s", err)
                 params, user_id = self._api._build_mqtt_params()
                 dev_topic = f"hb/app/{user_id}/device"
                 async with aiomqtt.Client(**params) as client:
                     self._client = client
                     self._user_id = user_id
                     self._reconnect_delay = 1.0
+                    check_session_first = True
                     await client.subscribe(dev_topic, qos=1)
                     self._connected.set()
                     _LOGGER.info("Jackery MQTT persistent session connected")
@@ -256,8 +281,16 @@ COMMAND_CONFIRM_TIMEOUT_SEC = 10.0
 _NON_VALUE_KEYS = frozenset({"cmd", "idx"})
 
 
+# Default time to stay signed out after the phone app takes the session.
+DEFAULT_YIELD_SECONDS = 15 * 60
+
+
 class JackeryCommandError(Exception):
     """A device command did not complete."""
+
+
+class JackerySessionYielded(JackeryCommandError):
+    """HA is deliberately signed out so the phone app can use the account."""
 
 
 class JackeryCommandUnconfirmed(JackeryCommandError):
@@ -346,6 +379,12 @@ class JackeryAPI:
         self._login_lock = threading.Lock()
         self._last_login_time: float = 0
         self._mqtt_session: Optional[JackeryMqttSession] = None
+        # Jackery allows one login per account. When another client (the
+        # phone app) takes the session, back off for this long instead of
+        # logging straight back in and kicking it out. 0 = never yield.
+        self.yield_seconds: float = DEFAULT_YIELD_SECONDS
+        self._yield_until: Optional[float] = None
+        self._yield_lock = threading.Lock()
 
     def _name_uuid_from_bytes_java(self, data: bytes) -> str:
         """Generate a version 3 UUID using an MD5 hash."""
@@ -455,15 +494,72 @@ class JackeryAPI:
             # "from None": the chained exception's message contains the URL.
             raise JackeryConnectionError(f"Request failed: {reason}") from None
 
-    def _get_request(self, url_path: str, params: Optional[dict] = None) -> dict:
-        """Make a GET request to the API, handling token expiry."""
+    # ---- Session yielding -------------------------------------------------
+
+    def is_yielding(self) -> bool:
+        """True while HA is deliberately leaving the session to another client."""
+        with self._yield_lock:
+            if self._yield_until is None:
+                return False
+            if time.monotonic() >= self._yield_until:
+                self._yield_until = None
+                return False
+            return True
+
+    def yield_remaining(self) -> float:
+        """Seconds left in the current yield (0 when not yielding)."""
+        with self._yield_lock:
+            if self._yield_until is None:
+                return 0.0
+            return max(0.0, self._yield_until - time.monotonic())
+
+    def reclaim_session(self) -> None:
+        """End a yield early; the next request logs in again."""
+        with self._yield_lock:
+            self._yield_until = None
+        _LOGGER.info("Reclaiming Jackery session (yield ended by user)")
+
+    def _start_yield(self) -> None:
+        with self._yield_lock:
+            self._yield_until = time.monotonic() + self.yield_seconds
+            self._token = None
+        _LOGGER.warning(
+            "Jackery session taken by another login (likely the phone app); "
+            "HA will stay signed out for %.0f min. Use 'Reclaim Jackery Session' "
+            "to take it back sooner.",
+            self.yield_seconds / 60,
+        )
+
+    def _raise_if_yielding(self) -> None:
+        if self.is_yielding():
+            raise JackerySessionYielded(
+                "HA is leaving the Jackery session to the phone app for another "
+                f"{self.yield_remaining() / 60:.0f} min; press 'Reclaim Jackery "
+                "Session' to take it back now"
+            )
+
+    # ---- HTTP ----------------------------------------------------------------
+
+    def _request(
+        self,
+        method: str,
+        url_path: str,
+        params: Optional[dict] = None,
+        form: Optional[dict] = None,
+    ) -> dict:
+        """Make an authenticated API request, handling token expiry.
+
+        On 10403 (session displaced by another login) HA yields for
+        ``yield_seconds`` instead of immediately logging back in, which would
+        just kick the phone app out again.
+        """
+        self._raise_if_yielding()
         if not self._token:
             _LOGGER.info("No token found, logging in.")
             if not self.login():
                 raise JackeryAuthenticationError("Unable to login to retrieve token.")
 
         headers = {
-            "content-type": "application/json",
             "accept": "*/*",
             "app_version": "1.0.5",
             "sys_version": "17.2",
@@ -474,32 +570,41 @@ class JackeryAPI:
             "model": "iPad Pro (12.9-inch) (3rd generation)",
             "token": self._token,
         }
+        if form is None:
+            headers["content-type"] = "application/json"
         full_url = f"{self.base_url}{url_path}"
-        _LOGGER.debug("Making API request to: %s", full_url)
+        _LOGGER.debug("Making API %s request to: %s", method, full_url)
 
-        try:
-            response = requests.get(
-                full_url, headers=headers, params=params, timeout=10
-            )
+        def send() -> dict:
+            if method == "POST":
+                response = requests.post(
+                    full_url, headers=headers, params=params, data=form, timeout=10
+                )
+            else:
+                response = requests.get(
+                    full_url, headers=headers, params=params, timeout=10
+                )
             _LOGGER.debug("API response status: %s", response.status_code)
             response.raise_for_status()
-            data = response.json()
+            return response.json()
+
+        try:
+            data = send()
             _LOGGER.debug("API response data: %s", _redact(data))
 
-            # 10402 = token expired; 10403 = session displaced by another login
-            if data.get("code") in (10402, 10403):
-                _LOGGER.info("Re-logging in (code=%s)...", data.get("code"))
+            code = data.get("code")
+            if code == 10403 and self.yield_seconds > 0:
+                self._start_yield()
+                self._raise_if_yielding()
+            # 10402 = token expired; 10403 with yielding disabled = take it back
+            if code in (10402, 10403):
+                _LOGGER.info("Re-logging in (code=%s)...", code)
                 if not self.login():
                     raise JackeryAuthenticationError(
                         "Failed to re-login after session invalidated."
                     )
-                # Retry the request with the new token
                 headers["token"] = self._token
-                response = requests.get(
-                    full_url, headers=headers, params=params, timeout=10
-                )
-                response.raise_for_status()
-                data = response.json()
+                data = send()
 
             if data.get("code") != 0:
                 error_msg = f"API Error: {data.get('msg', 'Unknown error')} (code: {data.get('code')})"
@@ -509,19 +614,76 @@ class JackeryAPI:
             return data
 
         except requests.RequestException as e:
-            _LOGGER.error("API request failed: %s", e)
+            _LOGGER.error("API request failed: %s", _describe_request_error(e))
             raise
 
+    def _get_request(self, url_path: str, params: Optional[dict] = None) -> dict:
+        """Make a GET request to the API, handling token expiry."""
+        return self._request("GET", url_path, params=params)
+
+    def check_session(self) -> None:
+        """Cheap authenticated call; raises JackerySessionYielded if displaced."""
+        self._get_request("/v1/device/bind/shared")
+
+    # ---- Devices -------------------------------------------------------------
+
     def get_device_list(self) -> dict:
-        """Get the list of devices."""
+        """Get owned devices plus devices other accounts have shared with us."""
         _LOGGER.info("Attempting to fetch device list from Jackery API")
         try:
             result = self._get_request("/v1/device/bind/list")
             _LOGGER.info("Successfully retrieved device list")
-            return result
         except Exception as e:
             _LOGGER.error("Failed to get device list: %s", str(e))
             raise
+
+        owned = list(result.get("data") or [])
+        try:
+            shared = self._get_shared_devices({d.get("devSn") for d in owned})
+        except JackerySessionYielded:
+            raise
+        except Exception as e:  # noqa: BLE001 - shared devices are optional
+            _LOGGER.warning("Could not fetch devices shared with this account: %s", e)
+            shared = []
+        if shared:
+            _LOGGER.info("Found %d device(s) shared with this account", len(shared))
+        return {**result, "data": owned + shared}
+
+    def _get_shared_devices(self, known_sns: set) -> list[dict]:
+        """Devices shared *to* this account by other accounts.
+
+        Mirrors socketry: /device/bind/shared lists the accounts sharing with
+        us ("receive"); /device/bind/share/list returns each one's devices.
+        What a shared account may do (read vs control) is decided by Jackery
+        and not known here; ``shareLevel`` is kept for diagnosis.
+        """
+        shared_data = self._get_request("/v1/device/bind/shared").get("data") or {}
+        devices: list[dict] = []
+        for share in shared_data.get("receive") or []:
+            body = self._request(
+                "POST",
+                "/v1/device/bind/share/list",
+                form={
+                    "bindUserId": str(share.get("bindUserId", "")),
+                    "level": str(share.get("level", "")),
+                },
+            )
+            for device in body.get("data") or []:
+                sn = device.get("devSn")
+                if not sn or sn in known_sns:
+                    continue
+                known_sns.add(sn)
+                devices.append(
+                    {
+                        **device,
+                        "devName": device.get("devNickname")
+                        or device.get("devName")
+                        or sn,
+                        "shared": True,
+                        "shareLevel": share.get("level"),
+                    }
+                )
+        return devices
 
     def get_device_detail(self, device_id: str) -> dict:
         """Get detailed information for a specified device."""
@@ -710,6 +872,7 @@ class JackeryAPI:
             raise RuntimeError("aiomqtt is not installed")
         if self._mqtt_session is None:
             raise RuntimeError("MQTT session not started - call start_mqtt_session() first")
+        self._raise_if_yielding()
 
         ts = int(time.time() * 1000)
         payload = {
