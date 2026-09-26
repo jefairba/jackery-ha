@@ -22,12 +22,12 @@ The following entities are only created for the Smart Transfer Switch:
 - Emergency Stop, AC1/AC2 Communication Fault, Cover Open, Temperature Fault, RTC Fault
 
 **Switches:**
-- Grid / Station, Force Charge, UPS Mode
-- Per-circuit switches
+- Force Charge
 - Per-plan toggle switches
 
 **Selects:**
 - Working Mode
+- Grid / Station (Grid / Battery), UPS Mode (Off / On), per-circuit On / Off. These are dropdowns rather than switches in this fork, so "turn off" voice, area and bulk commands can't reach them.
 
 **Numbers:**
 - Backup Reserve
@@ -61,7 +61,7 @@ Per-pack battery level sensors (`AC1 Pack N Battery`) appear only when a pack is
 
 ## Circuit Entities
 
-Circuit power sensors and on/off switches appear for Transfer Switch devices. Split-phase pairs are automatically detected and combined into single entities.
+Circuit power sensors and On/Off dropdowns appear for Transfer Switch devices. Split-phase pairs are automatically detected and combined into single entities.
 
 ## DC Output Variants
 
@@ -69,7 +69,7 @@ Some Jackery models report DC output as a single combined `odc` property. Others
 
 ## UPS Mode
 
-The UPS Mode switch and UPS Mode binary sensor are created for the Transfer Switch. UPS Mode is not available on standalone portable devices.
+The UPS Mode dropdown and UPS Mode binary sensor are created for the Transfer Switch. UPS Mode is not available on standalone portable devices.
 
 ## Transfer Switch Connected
 

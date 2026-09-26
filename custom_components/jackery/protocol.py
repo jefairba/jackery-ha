@@ -193,19 +193,25 @@ CONTROL_SPECS: dict[str, JackeryControlSpec] = {
         icon="mdi:transfer-switch",
         options=("Automatic Charging", "Scheduled Tasks", "Self Consumption"),
     ),
+    # UPS and Grid/Station can cut or switch the house's power, so they are
+    # dropdowns rather than switches: "turn off" / area / bulk commands and
+    # scenes that sweep up switches can't reach a select. Option order is
+    # the device value (index 0 -> 0, 1 -> 1).
     "ups": JackeryControlSpec(
         key="ups",
         slug="ups",
         name="UPS Mode",
-        platform="switch",
+        platform="select",
         icon="mdi:power-plug-battery",
+        options=("Off", "On"),
     ),
     "pss": JackeryControlSpec(
         key="pss",
         slug="pss",
         name="Grid / Station",
-        platform="switch",
+        platform="select",
         icon="mdi:transmission-tower",
+        options=("Grid", "Battery"),  # pss: 0 = grid, 1 = station
     ),
     "rc": JackeryControlSpec(
         key="rc",

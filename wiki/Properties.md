@@ -37,12 +37,12 @@ Properties marked **MQTT only** are not included in the HTTP snapshot and requir
 | `ip` | int | Input power (W) | HTTP | Total Input Power sensor |
 | `op` | int | Output power (W) | HTTP | Output Power sensor |
 | `ot` | int | Remaining output time | HTTP | Remaining Output Time sensor |
-| `pss` | int | Power system state (0=Grid, 1=Station) | HTTP | Power System State sensor + Grid/Station switch |
+| `pss` | int | Power system state (0=Grid, 1=Station) | HTTP | Power System State sensor + Grid / Station select |
 | `rb` | int | Remaining battery (%) | HTTP | Remaining Battery sensor |
 | `rc` | int | Rapid/force charging (0=off, 1=on) | HTTP | Force Charge switch |
 | `selfDt` | int | Self Consumption mode backup reserve (%) | HTTP | Self Consumption Mode Backup Reserve number |
 | `storm` | list | Weather/storm events | MQTT only | Not mapped (location-based alert system, complex) |
-| `ups` | int | UPS mode (0=off, 1=on) | HTTP | UPS Mode switch + binary sensor |
+| `ups` | int | UPS mode (0=off, 1=on) | HTTP | UPS Mode select + binary sensor |
 | `wps` | int | WiFi Protected Setup (0=off, 1=on) | HTTP | WiFi Protected Setup switch |
 
 ### AC Slot Sub-Object (ac1 / ac2)

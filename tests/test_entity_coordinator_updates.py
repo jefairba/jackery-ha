@@ -1051,43 +1051,48 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
 
     # ---- Transfer Switch command routing tests ----
 
-    async def test_switch_pss_routes_via_transfer_switch_command(self) -> None:
-        """PSS switch should use async_send_device_command, not async_set_device_property."""
+    async def test_grid_station_select_sends_same_command_as_old_switch(self) -> None:
+        """Grid / Station is a dropdown now; the wire command is unchanged."""
+        self.assertNotIn("pss", switch.SWITCH_DESCRIPTIONS)
         coordinator = TrackingCoordinator({"pss": 0})
         api = types.SimpleNamespace(
             async_send_device_command=AsyncMock(),
             async_set_device_property=AsyncMock(),
         )
-        entity = switch.JackerySwitchEntity(
+        entity = select.JackerySelectEntity(
             api=api,
             coordinator=coordinator,
-            description=switch.SWITCH_DESCRIPTIONS["pss"],
+            description=select.SELECT_DESCRIPTIONS["pss"],
             device_info=self.device_info,
         )
+        self.assertEqual(entity._attr_options, ["Grid", "Battery"])
+        self.assertEqual(entity.current_option, "Grid")
 
-        await entity.async_turn_on()
+        await entity.async_select_option("Battery")
 
         api.async_send_device_command.assert_awaited_once_with(
             "device-1", "serial-1", 4, {"cmd": 4, "pss": 1},
         )
         api.async_set_device_property.assert_not_awaited()
-        self.assertTrue(entity.is_on)
+        self.assertEqual(entity.current_option, "Battery")
 
-    async def test_switch_ups_routes_via_transfer_switch_command(self) -> None:
-        """UPS switch should use async_send_device_command."""
+    async def test_ups_select_sends_same_command_as_old_switch(self) -> None:
+        """UPS Mode is a dropdown now; the wire command is unchanged."""
+        self.assertNotIn("ups", switch.SWITCH_DESCRIPTIONS)
         coordinator = TrackingCoordinator({"ups": 0})
         api = types.SimpleNamespace(
             async_send_device_command=AsyncMock(),
             async_set_device_property=AsyncMock(),
         )
-        entity = switch.JackerySwitchEntity(
+        entity = select.JackerySelectEntity(
             api=api,
             coordinator=coordinator,
-            description=switch.SWITCH_DESCRIPTIONS["ups"],
+            description=select.SELECT_DESCRIPTIONS["ups"],
             device_info=self.device_info,
         )
+        self.assertEqual(entity._attr_options, ["Off", "On"])
 
-        await entity.async_turn_on()
+        await entity.async_select_option("On")
 
         api.async_send_device_command.assert_awaited_once_with(
             "device-1", "serial-1", 6, {"cmd": 6, "ups": 1},

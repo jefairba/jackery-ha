@@ -24,7 +24,6 @@ from .protocol import (
     supported_keys,
 )
 from .plan import JackeryPlanSwitch, _get_plans, has_plans
-from .circuit import JackeryCircuitSwitch, has_circuits, _get_circuits, get_logical_circuits
 
 SWITCH_KEYS = (
     "oac",
@@ -35,16 +34,12 @@ SWITCH_KEYS = (
     "outPrio",
     "odcPrio",
     "dhg_recall",
-    "pss",
-    "ups",
     "rc",
     "wps",
 )
 
 # Transfer Switch commands: key -> (action_id, cmd)
 TRANSFER_SWITCH_COMMANDS: dict[str, tuple[int, int]] = {
-    "pss": (4, 4),
-    "ups": (6, 6),
     "rc": (3, 5),
     "wps": (22, 26),
 }
@@ -62,8 +57,6 @@ SWITCH_DESCRIPTIONS: dict[str, EntityDescription] = {
     "outPrio": _switch_desc("outPrio", entity_category=EntityCategory.CONFIG),
     "odcPrio": _switch_desc("odcPrio", entity_category=EntityCategory.CONFIG),
     "dhg_recall": _switch_desc("dhg_recall", entity_category=EntityCategory.CONFIG),
-    "pss": _switch_desc("pss", entity_category=None),
-    "ups": _switch_desc("ups", entity_category=None),
     "rc": _switch_desc("rc", entity_category=None),
     "wps": _switch_desc("wps", entity_category=EntityCategory.CONFIG),
 }
@@ -130,22 +123,6 @@ async def async_setup_entry(
                         pid=pid,
                     )
                 )
-
-    # Add circuit switches for Transfer Switch devices
-    for device in devices:
-        device_id = device["devId"]
-        coordinator = coordinators.get(device_id)
-        if coordinator is None or not has_circuits(coordinator):
-            continue
-        for logical in get_logical_circuits(_get_circuits(coordinator)):
-            entities.append(
-                JackeryCircuitSwitch(
-                    api=api,
-                    coordinator=coordinator,
-                    device_info=device,
-                    logical=logical,
-                )
-            )
 
     async_add_entities(entities)
 

@@ -46,7 +46,7 @@ def _load(stubbed):
         SensorEntity=object,
         SensorStateClass=types.SimpleNamespace(MEASUREMENT="measurement"),
     )
-    stub("homeassistant.components.switch", SwitchEntity=object)
+    stub("homeassistant.components.select", SelectEntity=object)
     stub("homeassistant.const", EntityCategory=enum, UnitOfPower=types.SimpleNamespace(WATT="W"))
     stub("homeassistant.exceptions", HomeAssistantError=HomeAssistantError)
     stub("homeassistant.helpers")
@@ -108,7 +108,7 @@ class CircuitLegTests(unittest.IsolatedAsyncioTestCase):
             "indices": list(indices),
             "name": "Dryer",
         }
-        switch = self.circuit.JackeryCircuitSwitch(
+        switch = self.circuit.JackeryCircuitSelect(
             api, coordinator, {"devId": "ts-1", "devSn": "ts-sn"}, logical
         )
         return switch, coordinator
@@ -116,7 +116,7 @@ class CircuitLegTests(unittest.IsolatedAsyncioTestCase):
     async def test_both_legs_switch_when_both_confirm(self):
         api = FakeAPI()
         switch, coordinator = self.make_switch(api, [3, 4], [1, 1])
-        await switch.async_turn_off()
+        await switch.async_select_option("Off")
         self.assertEqual(api.calls, [(3, False), (4, False)])
         self.assertEqual([c["sw"] for c in coordinator.data["_circuits"]], [0, 0])
 
@@ -124,7 +124,7 @@ class CircuitLegTests(unittest.IsolatedAsyncioTestCase):
         api = FakeAPI(fail={(4, False)})
         switch, coordinator = self.make_switch(api, [3, 4], [1, 1])
         with self.assertRaises(HomeAssistantError) as ctx:
-            await switch.async_turn_off()
+            await switch.async_select_option("Off")
         # leg 3 switched, leg 4 failed (may have applied) -> both sent back on
         self.assertEqual(api.calls, [(3, False), (4, False), (3, True), (4, True)])
         self.assertIn("restored leg 3, leg 4", str(ctx.exception))
@@ -138,7 +138,7 @@ class CircuitLegTests(unittest.IsolatedAsyncioTestCase):
         switch, _ = self.make_switch(api, [3, 4], [1, 1])
         with self.assertRaises(HomeAssistantError) as ctx:
             with self.assertLogs(self.circuit._LOGGER, level="ERROR"):
-                await switch.async_turn_off()
+                await switch.async_select_option("Off")
         message = str(ctx.exception)
         self.assertIn("WARNING: 240V circuit may be on only one leg", message)
         self.assertIn("leg 3", message)
@@ -148,7 +148,7 @@ class CircuitLegTests(unittest.IsolatedAsyncioTestCase):
         api = FakeAPI(fail={(3, True)})
         switch, _ = self.make_switch(api, [3, 4], [0, 0])
         with self.assertRaises(HomeAssistantError):
-            await switch.async_turn_on()
+            await switch.async_select_option("On")
         # leg 4 never sent; leg 3 (may have applied) put back off
         self.assertEqual(api.calls, [(3, True), (3, False)])
 
@@ -156,8 +156,24 @@ class CircuitLegTests(unittest.IsolatedAsyncioTestCase):
         api = FakeAPI(fail={(5, False)})
         switch, _ = self.make_switch(api, [5], [1])
         with self.assertRaises(HomeAssistantError):
-            await switch.async_turn_off()
+            await switch.async_select_option("Off")
         self.assertEqual(api.calls, [(5, False)])
+
+    async def test_is_a_dropdown_not_a_switch(self):
+        switch, _ = self.make_switch(FakeAPI(), [5], [1])
+        self.assertEqual(switch._attr_options, ["Off", "On"])
+        self.assertEqual(switch.current_option, "On")
+        # No turn_on/turn_off: bulk "turn off" actions cannot target it.
+        self.assertFalse(hasattr(switch, "async_turn_off"))
+        self.assertFalse(hasattr(switch, "async_turn_on"))
+        self.assertTrue(switch._attr_unique_id.endswith("_select"))
+
+    async def test_rejects_unknown_option(self):
+        api = FakeAPI()
+        switch, _ = self.make_switch(api, [5], [1])
+        with self.assertRaises(HomeAssistantError):
+            await switch.async_select_option("off")
+        self.assertEqual(api.calls, [])
 
 
 if __name__ == "__main__":

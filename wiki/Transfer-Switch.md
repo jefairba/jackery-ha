@@ -22,13 +22,13 @@ The integration also exposes **Auto Mode Backup Reserve**, **Scheduled Mode Back
 
 See [Charging Plans](Charging-Plans) for details on setting up scheduled charge/discharge plans used by Scheduled Tasks mode.
 
-## Grid / Station Toggle
+## Grid / Station
 
-The **Grid / Station** switch selects whether the home loads are powered by the utility grid or by the connected battery devices. Toggling this switch does not change the working mode.
+The **Grid / Station** dropdown (Grid / Battery) selects whether the home loads are powered by the utility grid or by the connected battery devices. Changing it does not change the working mode.
 
 ## UPS Mode
 
-The **UPS Mode** switch enables approximately 20ms grid-to-battery switchover on a power interruption. When UPS Mode is enabled, the **UPS Mode** binary sensor also reflects the active state.
+The **UPS Mode** dropdown (Off / On) enables approximately 20ms grid-to-battery switchover on a power interruption. When UPS Mode is enabled, the **UPS Mode** binary sensor also reflects the active state.
 
 ## Force Charge
 
@@ -69,7 +69,7 @@ The Transfer Switch monitors and controls individual circuits in the connected e
 For each logical circuit, the integration creates:
 
 - A **power sensor** showing current power consumption in watts.
-- An **on/off switch** to toggle the circuit breaker.
+- An **On / Off dropdown** to cut or restore power to the circuit. (A dropdown, not a switch, so voice/area/bulk "turn off" commands can't reach it.)
 
 Circuit names are decoded from the device configuration. Circuits without a configured name fall back to their index number.
 

@@ -14,7 +14,7 @@ See [Device Availability](Device-Availability) for a full breakdown of which con
 | DC Car Output | Toggle DC car output |
 | DC Output | Toggle combined DC output |
 | Force Charge | Force battery to charge from grid regardless of working mode (Transfer Switch) |
-| Grid / Station | Toggle between grid power and station power (Transfer Switch) |
+| Grid / Station | Dropdown (Grid / Battery) selecting grid or station power (Transfer Switch). A select, not a switch, in this fork. |
 | Plan {name} | Toggle individual scheduled plans on/off (Transfer Switch) |
 | Super Fast Charge | Toggle super fast charge mode |
 | UPS Mode | Toggle UPS mode (Transfer Switch) |

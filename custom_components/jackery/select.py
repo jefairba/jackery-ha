@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .api import JackeryAPI
+from .circuit import JackeryCircuitSelect, _get_circuits, get_logical_circuits, has_circuits
 from .const import CHARGING_PLAN_DATA, DOMAIN, ENTITY_HELP_TEXT
 from homeassistant.const import EntityCategory
 from .protocol import (
@@ -32,8 +33,10 @@ from .protocol import (
 # Transfer Switch commands for select-like properties (key -> (action_id, cmd))
 TRANSFER_SWITCH_SELECT_COMMANDS: dict[str, tuple[int, int]] = {
     "en": (20, 20),
+    "pss": (4, 4),
+    "ups": (6, 6),
 }
-SELECT_KEYS = ("lm", "cs", "lps", "en")
+SELECT_KEYS = ("lm", "cs", "lps", "en", "pss", "ups")
 
 def _select_desc(key: str, **kwargs) -> EntityDescription:
     spec = control_spec(key)
@@ -44,6 +47,8 @@ SELECT_DESCRIPTIONS: dict[str, EntityDescription] = {
     "cs": _select_desc("cs", entity_category=EntityCategory.CONFIG),
     "lps": _select_desc("lps", entity_category=EntityCategory.CONFIG),
     "en": _select_desc("en", entity_category=None),
+    "pss": _select_desc("pss", entity_category=None),
+    "ups": _select_desc("ups", entity_category=None),
 }
 SELECT_OPTIONS: dict[str, tuple[str, ...]] = {
     key: control_spec(key).options for key in SELECT_KEYS
@@ -92,6 +97,21 @@ async def async_setup_entry(
                     coordinator=coordinator,
                     description=CHARGING_PLAN_REPEAT_DESCRIPTION,
                     device_info=device,
+                )
+            )
+
+    # Circuit on/off: one dropdown per logical circuit (240V pairs combined)
+    for device in devices:
+        coordinator = coordinators.get(device["devId"])
+        if coordinator is None or not has_circuits(coordinator):
+            continue
+        for logical in get_logical_circuits(_get_circuits(coordinator)):
+            entities.append(
+                JackeryCircuitSelect(
+                    api=api,
+                    coordinator=coordinator,
+                    device_info=device,
+                    logical=logical,
                 )
             )
 
