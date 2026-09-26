@@ -44,7 +44,7 @@ class CommandConfirmationTests(unittest.IsolatedAsyncioTestCase):
         reply = {"deviceSn": "ts-sn", "actionId": 3, "body": {"cmd": 5, "rc": 1}}
         session = FakeSession(reply=reply)
         self.assertEqual(await self.send(session), reply)
-        self.assertEqual(session.timeout, 20.0)
+        self.assertEqual(session.timeout, 10.0)
 
     async def test_string_and_int_values_compare_equal(self):
         session = FakeSession(reply={"body": {"rc": "1"}})

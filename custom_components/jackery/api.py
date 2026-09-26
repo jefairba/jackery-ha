@@ -247,8 +247,10 @@ class JackeryMqttSession:
                 self._pending_future = None
 
 
-# How long a command may take to be echoed back through Jackery's cloud.
-COMMAND_CONFIRM_TIMEOUT_SEC = 20.0
+# How long to wait for the device to echo a command back through Jackery's
+# cloud. Long enough for a slow round trip, short enough that someone at the
+# dashboard is still watching when the answer (or the error) arrives.
+COMMAND_CONFIRM_TIMEOUT_SEC = 10.0
 
 # Body keys that are opcodes/addresses rather than commanded values.
 _NON_VALUE_KEYS = frozenset({"cmd", "idx"})
