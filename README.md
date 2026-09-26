@@ -25,8 +25,11 @@ Differences from [turmacar/jackery-homeassistant](https://github.com/turmacar/ja
 - **Commands must be confirmed.** A switch/select/number only changes in HA when the device reports the new value within 10 s; otherwise HA shows *rejected* or *unconfirmed* and re-reads the real state.
 - **240V circuits are never left on one leg.** If either leg fails, both are returned to their previous state (with a loud warning if that fails too).
 - **Stale data is visible.** A *Data Stale* sensor turns on after ~2 min without fresh cloud data; entities go unavailable after ~5 min (was 15).
-- **Power-cutting controls are dropdowns, not switches.** Circuit On/Off, *UPS Mode* (Off/On) and *Grid / Station* (Grid/Battery) are selects, so "turn off" voice commands, area commands ("turn off the garage"), `homeassistant.turn_off` and scenes that sweep up switches can't reach them. Force Charge stays a switch.
+- **Power-cutting controls are dropdowns, not switches.** Circuit On/Off, *UPS Mode* (Off/On), *Grid / Station* (Grid/Battery) and the Explorer's *AC Output* (Off/On, it feeds the Transfer Switch) are selects, so "turn off" voice commands, area commands ("turn off the garage"), `homeassistant.turn_off` and scenes that sweep up switches can't reach them. Force Charge stays a switch.
 - **Sharing the one Jackery login with the phone app.** Jackery allows one sign-in per account. When the app signs in, HA now steps aside for a configurable time (default 15 min; *Configure* on the integration) instead of immediately signing the app out. A *Yielding to Jackery App* sensor and a *Reclaim Jackery Session* button live on a *Jackery Cloud Session* device.
+- **Transfer Switch commands only go to the Transfer Switch.** Upstream could send the Transfer Switch's UPS command (action 6) to an Explorer, where action 6 means DC input. Transfer Switch-only controls are no longer created on portables.
+- **Portable dropdowns work.** Light mode, charge speed and battery protection sent the option's label where the device needs its number.
+- **"99.9 h" placeholders show as unknown** instead of a fake time estimate.
 - **Devices shared to the account are discovered** (Jackery app sharing). Whether a shared account can *control* a device is decided by Jackery and has not been verified.
 
 ## Features

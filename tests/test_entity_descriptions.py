@@ -169,6 +169,16 @@ def tearDownModule() -> None:
 class EntityDescriptionTests(unittest.TestCase):
     """Validate metadata for the read-only Jackery entities."""
 
+    def test_time_estimate_placeholders_are_unknown(self) -> None:
+        """~999 tenths (99.9 h) means 'not applicable', not a real estimate."""
+        by_key = {d.key: d for d in const.SENSOR_DESCRIPTIONS}
+        for key in ("it", "ot", "ac1_it", "ac1_ot", "ac2_it", "ac2_ot"):
+            convert = by_key[key].value
+            self.assertIsNone(convert(999), key)
+            self.assertIsNone(convert(998), key)
+            self.assertEqual(convert(125), 12.5, key)
+            self.assertEqual(convert(0), 0.0, key)
+
     def test_sensor_descriptions_include_new_live_api_fields(self) -> None:
         """New live properties should have sensor descriptions with the right units."""
         sensors = {

@@ -8,7 +8,7 @@ See [Device Availability](Device-Availability) for a full breakdown of which con
 
 | Entity | Description |
 |--------|-------------|
-| AC Output | Toggle AC output |
+| AC Output | Dropdown (Off / On) for AC output. On an Explorer connected to the Transfer Switch this feeds the house, so it is a select, not a switch, in this fork. |
 | Charging Plan | Enable or disable charging plans |
 | Circuit {name} | Toggle individual circuits on/off (Transfer Switch) |
 | DC Car Output | Toggle DC car output |

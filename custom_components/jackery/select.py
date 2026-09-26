@@ -20,6 +20,8 @@ from .circuit import JackeryCircuitSelect, _get_circuits, get_logical_circuits, 
 from .const import CHARGING_PLAN_DATA, DOMAIN, ENTITY_HELP_TEXT
 from homeassistant.const import EntityCategory
 from .protocol import (
+    device_control_keys,
+    is_transfer_switch_device,
     CHARGING_PLAN_REPEAT_TO_MASK,
     charging_plan_repeat_mask,
     charging_plan_repeat_option,
@@ -36,7 +38,7 @@ TRANSFER_SWITCH_SELECT_COMMANDS: dict[str, tuple[int, int]] = {
     "pss": (4, 4),
     "ups": (6, 6),
 }
-SELECT_KEYS = ("lm", "cs", "lps", "en", "pss", "ups")
+SELECT_KEYS = ("lm", "cs", "lps", "en", "pss", "ups", "oac")
 
 def _select_desc(key: str, **kwargs) -> EntityDescription:
     spec = control_spec(key)
@@ -49,6 +51,7 @@ SELECT_DESCRIPTIONS: dict[str, EntityDescription] = {
     "en": _select_desc("en", entity_category=None),
     "pss": _select_desc("pss", entity_category=None),
     "ups": _select_desc("ups", entity_category=None),
+    "oac": _select_desc("oac", entity_category=None),
 }
 SELECT_OPTIONS: dict[str, tuple[str, ...]] = {
     key: control_spec(key).options for key in SELECT_KEYS
@@ -81,7 +84,7 @@ async def async_setup_entry(
         if coordinator is None or not device_sn:
             continue
 
-        for key in supported_keys(coordinator.data, SELECT_KEYS):
+        for key in device_control_keys(device, coordinator.data, SELECT_KEYS):
             entities.append(
                 JackerySelectEntity(
                     api=api,
@@ -182,6 +185,10 @@ class JackerySelectEntity(CoordinatorEntity, SelectEntity):
         self._options = SELECT_OPTIONS[description.key]
         self._device_id = device_info["devId"]
         self._device_sn = device_info["devSn"]
+        # Transfer Switch command IDs mean other things on portables.
+        self._is_transfer_switch = is_transfer_switch_device(
+            device_info, coordinator.data
+        )
         self._attr_unique_id = f"{self._device_id}_{description.key}"
         self._attr_name = description.name
         self._attr_icon = description.icon
@@ -220,7 +227,11 @@ class JackerySelectEntity(CoordinatorEntity, SelectEntity):
             )
 
         try:
-            transfer_switch_cmd = TRANSFER_SWITCH_SELECT_COMMANDS.get(self.entity_description.key)
+            transfer_switch_cmd = (
+                TRANSFER_SWITCH_SELECT_COMMANDS.get(self.entity_description.key)
+                if self._is_transfer_switch
+                else None
+            )
             if transfer_switch_cmd is not None:
                 action_id, cmd = transfer_switch_cmd
                 int_value = self._attr_options.index(option)
@@ -231,11 +242,13 @@ class JackerySelectEntity(CoordinatorEntity, SelectEntity):
                     {"cmd": cmd, self.entity_description.key: int_value},
                 )
             else:
+                # Device values are the option's position (e.g. fast=0,
+                # mute=1); the API sends int(value), so a label would fail.
                 await self._api.async_set_device_property(
                     self._device_id,
                     self._device_sn,
                     self._slug,
-                    option,
+                    self._options.index(option),
                 )
         except asyncio.CancelledError:
             raise

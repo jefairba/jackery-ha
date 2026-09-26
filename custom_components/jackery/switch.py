@@ -19,6 +19,8 @@ from .api import JackeryAPI
 from .const import CHARGING_PLAN_SWITCH, DOMAIN, ENTITY_HELP_TEXT
 from homeassistant.const import EntityCategory
 from .protocol import (
+    device_control_keys,
+    is_transfer_switch_device,
     control_spec,
     has_charging_plan_switch_support,
     supported_keys,
@@ -26,7 +28,6 @@ from .protocol import (
 from .plan import JackeryPlanSwitch, _get_plans, has_plans
 
 SWITCH_KEYS = (
-    "oac",
     "odc",
     "odcu",
     "odcc",
@@ -49,7 +50,6 @@ def _switch_desc(key: str, **kwargs) -> EntityDescription:
     return EntityDescription(key=spec.key, name=spec.name, icon=spec.icon, **kwargs)
 
 SWITCH_DESCRIPTIONS: dict[str, EntityDescription] = {
-    "oac": _switch_desc("oac", entity_category=None),
     "odc": _switch_desc("odc", entity_category=None),
     "odcu": _switch_desc("odcu", entity_category=None),
     "odcc": _switch_desc("odcc", entity_category=None),
@@ -87,7 +87,7 @@ async def async_setup_entry(
         if coordinator is None or not device_sn:
             continue
 
-        for key in supported_keys(coordinator.data, SWITCH_KEYS):
+        for key in device_control_keys(device, coordinator.data, SWITCH_KEYS):
             entities.append(
                 JackerySwitchEntity(
                     api=api,
@@ -190,6 +190,10 @@ class JackerySwitchEntity(CoordinatorEntity, SwitchEntity):
         self._slug = control_spec(description.key).slug
         self._device_id = device_info["devId"]
         self._device_sn = device_info["devSn"]
+        # Transfer Switch command IDs mean other things on portables.
+        self._is_transfer_switch = is_transfer_switch_device(
+            device_info, coordinator.data
+        )
         self._device_info = device_info
         self._attr_unique_id = f"{self._device_id}_switch_{description.key}"
         self._attr_name = description.name
@@ -228,7 +232,9 @@ class JackerySwitchEntity(CoordinatorEntity, SwitchEntity):
         """Set the underlying Jackery property."""
         key = self.entity_description.key
         try:
-            box_cmd = TRANSFER_SWITCH_COMMANDS.get(key)
+            box_cmd = (
+                TRANSFER_SWITCH_COMMANDS.get(key) if self._is_transfer_switch else None
+            )
             if box_cmd is not None:
                 action_id, cmd = box_cmd
                 await self._api.async_send_device_command(

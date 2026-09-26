@@ -37,6 +37,21 @@ protocol = load_protocol_module()
 class ProtocolTests(unittest.TestCase):
     """Validate control metadata and capability detection."""
 
+    def test_transfer_switch_controls_never_created_on_portables(self) -> None:
+        """An Explorer reporting `ups` must not get the Transfer Switch UPS control."""
+        explorer = {"devId": "e", "devSn": "E", "modelCode": 13}
+        props = {"ups": 0, "oac": 1, "rb": 86}
+        keys = ("ups", "oac", "pss", "en", "rc")
+        self.assertEqual(protocol.device_control_keys(explorer, props, keys), ["oac"])
+
+    def test_transfer_switch_keeps_its_controls(self) -> None:
+        box = {"devId": "t", "devSn": "T", "modelCode": 2001}
+        props = {"ups": 1, "pss": 0, "en": 0, "rc": 0}
+        self.assertEqual(
+            sorted(protocol.device_control_keys(box, props, ("ups", "pss", "en", "rc"))),
+            ["en", "pss", "rc", "ups"],
+        )
+
     def test_load_protocol_module_cleans_up_temporary_sys_modules_entry(self) -> None:
         """Loading the helper should not leak its temporary import alias."""
         sys.modules.pop("jackery_protocol", None)

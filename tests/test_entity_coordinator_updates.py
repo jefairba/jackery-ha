@@ -371,31 +371,37 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
         "devName": "Jackery Explorer",
         "productType": "Explorer 1000",
     }
+    ts_device_info = {
+        "devId": "device-1",
+        "devSn": "serial-1",
+        "devName": "Smart Transfer Switch",
+        "modelCode": 2001,
+    }
 
     async def test_switch_updates_coordinator_with_copied_snapshot(self) -> None:
         """Switch writes should publish a copied payload and request refresh."""
-        original_data = {"oac": 0, "unchanged": 7}
+        original_data = {"odc": 0, "unchanged": 7}
         coordinator = TrackingCoordinator(original_data)
         api = types.SimpleNamespace(async_set_device_property=AsyncMock())
         entity = switch.JackerySwitchEntity(
             api=api,
             coordinator=coordinator,
-            description=switch.SWITCH_DESCRIPTIONS["oac"],
+            description=switch.SWITCH_DESCRIPTIONS["odc"],
             device_info=self.device_info,
         )
 
-        self.assertEqual(entity._attr_unique_id, "device-1_switch_oac")
+        self.assertEqual(entity._attr_unique_id, "device-1_switch_odc")
 
         await entity.async_turn_on()
 
         api.async_set_device_property.assert_awaited_once_with(
             "device-1",
             "serial-1",
-            "ac",
+            "dc",
             1,
         )
-        self.assertEqual(original_data, {"oac": 0, "unchanged": 7})
-        self.assertEqual(coordinator.updated_data_calls, [{"oac": 1, "unchanged": 7}])
+        self.assertEqual(original_data, {"odc": 0, "unchanged": 7})
+        self.assertEqual(coordinator.updated_data_calls, [{"odc": 1, "unchanged": 7}])
         self.assertIsNot(coordinator.data, original_data)
         self.assertEqual(coordinator.refresh_requests, 1)
         self.assertEqual(entity.write_count, 0)
@@ -403,12 +409,12 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_switch_turn_off_uses_numeric_payload(self) -> None:
         """Switch off writes should send the raw integer state."""
-        coordinator = TrackingCoordinator({"oac": 1, "unchanged": 7})
+        coordinator = TrackingCoordinator({"odc": 1, "unchanged": 7})
         api = types.SimpleNamespace(async_set_device_property=AsyncMock())
         entity = switch.JackerySwitchEntity(
             api=api,
             coordinator=coordinator,
-            description=switch.SWITCH_DESCRIPTIONS["oac"],
+            description=switch.SWITCH_DESCRIPTIONS["odc"],
             device_info=self.device_info,
         )
 
@@ -417,10 +423,10 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
         api.async_set_device_property.assert_awaited_once_with(
             "device-1",
             "serial-1",
-            "ac",
+            "dc",
             0,
         )
-        self.assertEqual(coordinator.updated_data_calls, [{"oac": 0, "unchanged": 7}])
+        self.assertEqual(coordinator.updated_data_calls, [{"odc": 0, "unchanged": 7}])
         self.assertFalse(entity.is_on)
 
     async def test_select_updates_coordinator_with_copied_snapshot(self) -> None:
@@ -441,7 +447,7 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
             "device-1",
             "serial-1",
             "light",
-            "high",
+            2,  # "high" is option index 2; the API sends int(value)
         )
         self.assertEqual(original_data, {"lm": 0, "unchanged": 7})
         self.assertEqual(coordinator.updated_data_calls, [{"lm": 2, "unchanged": 7}])
@@ -761,14 +767,14 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_switch_does_not_wrap_cancellation(self) -> None:
         """Switch writes should propagate cancellation errors unchanged."""
-        coordinator = TrackingCoordinator({"oac": 0})
+        coordinator = TrackingCoordinator({"odc": 0})
         api = types.SimpleNamespace(
             async_set_device_property=AsyncMock(side_effect=asyncio.CancelledError())
         )
         entity = switch.JackerySwitchEntity(
             api=api,
             coordinator=coordinator,
-            description=switch.SWITCH_DESCRIPTIONS["oac"],
+            description=switch.SWITCH_DESCRIPTIONS["odc"],
             device_info=self.device_info,
         )
 
@@ -1063,7 +1069,7 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
             api=api,
             coordinator=coordinator,
             description=select.SELECT_DESCRIPTIONS["pss"],
-            device_info=self.device_info,
+            device_info=self.ts_device_info,
         )
         self.assertEqual(entity._attr_options, ["Grid", "Battery"])
         self.assertEqual(entity.current_option, "Grid")
@@ -1088,7 +1094,7 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
             api=api,
             coordinator=coordinator,
             description=select.SELECT_DESCRIPTIONS["ups"],
-            device_info=self.device_info,
+            device_info=self.ts_device_info,
         )
         self.assertEqual(entity._attr_options, ["Off", "On"])
 
@@ -1110,7 +1116,7 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
             api=api,
             coordinator=coordinator,
             description=switch.SWITCH_DESCRIPTIONS["rc"],
-            device_info=self.device_info,
+            device_info=self.ts_device_info,
         )
 
         await entity.async_turn_on()
@@ -1127,23 +1133,45 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
             "device-1", "serial-1", 3, {"cmd": 5, "rc": 0},
         )
 
-    async def test_switch_oac_routes_via_standard_property(self) -> None:
-        """Non-Transfer-Switch keys should use the standard socketry path."""
-        coordinator = TrackingCoordinator({"oac": 0})
+    async def test_ac_output_is_a_dropdown_using_portable_command(self) -> None:
+        """AC Output feeds the house via the Transfer Switch: dropdown, not switch."""
+        self.assertNotIn("oac", switch.SWITCH_DESCRIPTIONS)
+        coordinator = TrackingCoordinator({"oac": 1})
         api = types.SimpleNamespace(
             async_send_device_command=AsyncMock(),
             async_set_device_property=AsyncMock(),
         )
-        entity = switch.JackerySwitchEntity(
+        entity = select.JackerySelectEntity(
             api=api,
             coordinator=coordinator,
-            description=switch.SWITCH_DESCRIPTIONS["oac"],
+            description=select.SELECT_DESCRIPTIONS["oac"],
             device_info=self.device_info,
         )
+        self.assertEqual(entity.current_option, "On")
 
-        await entity.async_turn_on()
+        await entity.async_select_option("Off")
 
-        api.async_set_device_property.assert_awaited_once()
+        api.async_set_device_property.assert_awaited_once_with(
+            "device-1", "serial-1", "ac", 0
+        )
+        api.async_send_device_command.assert_not_awaited()
+
+    async def test_transfer_switch_command_never_sent_to_a_portable(self) -> None:
+        """Action 6 is UPS on the Transfer Switch but DC input on an Explorer."""
+        coordinator = TrackingCoordinator({"ups": 0})
+        api = types.SimpleNamespace(
+            async_send_device_command=AsyncMock(),
+            async_set_device_property=AsyncMock(),
+        )
+        entity = select.JackerySelectEntity(
+            api=api,
+            coordinator=coordinator,
+            description=select.SELECT_DESCRIPTIONS["ups"],
+            device_info=self.device_info,  # an Explorer
+        )
+
+        await entity.async_select_option("On")
+
         api.async_send_device_command.assert_not_awaited()
 
     async def test_select_en_routes_via_transfer_switch_command(self) -> None:
@@ -1157,7 +1185,7 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
             api=api,
             coordinator=coordinator,
             description=select.SELECT_DESCRIPTIONS["en"],
-            device_info=self.device_info,
+            device_info=self.ts_device_info,
         )
 
         await entity.async_select_option("Scheduled Tasks")
@@ -1198,7 +1226,7 @@ class CoordinatorUpdateTests(unittest.IsolatedAsyncioTestCase):
             api=api,
             coordinator=coordinator,
             description=number.NUMBER_DESCRIPTIONS["ddt"],
-            device_info=self.device_info,
+            device_info=self.ts_device_info,
         )
 
         await entity.async_set_native_value(50)

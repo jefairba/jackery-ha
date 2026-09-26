@@ -274,6 +274,16 @@ class JackerySensorEntityDescription(SensorEntityDescription):
 
 # Sensor descriptions
 # This defines all the sensors we'll create for each device.
+# Time estimates arrive in tenths of an hour. The device reports ~999 (99.9 h)
+# when an estimate doesn't apply - e.g. "time to full" while idle - or is off
+# its scale, so treat 998+ as unknown rather than a real 99.9 hours.
+_HOURS_NOT_APPLICABLE = 998
+
+
+def _tenths_of_hour(value):
+    return None if value >= _HOURS_NOT_APPLICABLE else value / 10.0
+
+
 SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
     JackerySensorEntityDescription(
         key="rb",
@@ -340,7 +350,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=None,
-        value=lambda value: value / 10.0,
+        value=_tenths_of_hour,
     ),
     JackerySensorEntityDescription(
         key="ot",
@@ -349,7 +359,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=None,
-        value=lambda value: value / 10.0,
+        value=_tenths_of_hour,
     ),
     JackerySensorEntityDescription(
         key="acov",
@@ -550,7 +560,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value=lambda value: value / 10.0,
+        value=_tenths_of_hour,
     ),
     JackerySensorEntityDescription(
         key="ac1_it",
@@ -559,7 +569,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value=lambda value: value / 10.0,
+        value=_tenths_of_hour,
     ),
     JackerySensorEntityDescription(
         key="ac1_bs",
@@ -615,7 +625,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value=lambda value: value / 10.0,
+        value=_tenths_of_hour,
     ),
     JackerySensorEntityDescription(
         key="ac2_it",
@@ -624,7 +634,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value=lambda value: value / 10.0,
+        value=_tenths_of_hour,
     ),
     JackerySensorEntityDescription(
         key="ac2_bs",

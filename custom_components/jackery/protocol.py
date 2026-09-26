@@ -36,13 +36,16 @@ class JackeryControlSpec:
 
 CONTROL_SPECS: dict[str, JackeryControlSpec] = {
     # Portable device properties
+    # AC Output feeds the Transfer Switch, i.e. the house during an outage,
+    # so it is a dropdown like the circuits: bulk "turn off" can't reach it.
     "oac": JackeryControlSpec(
         key="oac",
         slug="ac",
         name="AC Output",
-        platform="switch",
+        platform="select",
         icon="mdi:power-plug",
         action_id=4,
+        options=("Off", "On"),
     ),
     "odc": JackeryControlSpec(
         key="odc",
@@ -276,6 +279,28 @@ def _normalize_model_name(value: object) -> str:
 
     normalized = _MODEL_NAME_SANITIZER.sub(" ", value.casefold())
     return " ".join(normalized.split())
+
+
+# Controls whose commands only exist on the Transfer Switch. Their action IDs
+# mean something else on a portable (e.g. action 6 is UPS on the Transfer
+# Switch but DC input on an Explorer), so they are never created elsewhere.
+TRANSFER_SWITCH_ONLY_KEYS = frozenset(
+    {"en", "pss", "ups", "rc", "wps", "ddt", "autoDt", "cdsDt", "selfDt"}
+)
+
+
+def device_control_keys(
+    device_info: Mapping[str, object] | None,
+    properties: Mapping[str, object] | None,
+    keys,
+) -> list[str]:
+    """supported_keys(), minus Transfer Switch-only controls on other devices."""
+    is_box = is_transfer_switch_device(device_info, properties)
+    return [
+        key
+        for key in supported_keys(properties, keys)
+        if is_box or key not in TRANSFER_SWITCH_ONLY_KEYS
+    ]
 
 
 def is_transfer_switch_device(

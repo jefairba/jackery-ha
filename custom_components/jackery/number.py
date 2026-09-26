@@ -20,7 +20,7 @@ from homeassistant.helpers.update_coordinator import (
 from .api import JackeryAPI
 from .const import DOMAIN, ENTITY_HELP_TEXT
 from homeassistant.const import EntityCategory
-from .protocol import control_spec, supported_keys
+from .protocol import control_spec, device_control_keys, is_transfer_switch_device, supported_keys
 
 NUMBER_KEYS = ("ast", "pm", "sltb", "ddt", "autoDt", "cdsDt", "selfDt")
 
@@ -80,7 +80,7 @@ async def async_setup_entry(
         if coordinator is None or not device_sn:
             continue
 
-        for key in supported_keys(coordinator.data, NUMBER_KEYS):
+        for key in device_control_keys(device, coordinator.data, NUMBER_KEYS):
             entities.append(
                 JackeryNumberEntity(
                     api=api,
@@ -113,6 +113,10 @@ class JackeryNumberEntity(CoordinatorEntity, NumberEntity):
         min_value, max_value, step = NUMBER_RANGES[description.key]
         self._device_id = device_info["devId"]
         self._device_sn = device_info["devSn"]
+        # Transfer Switch command IDs mean other things on portables.
+        self._is_transfer_switch = is_transfer_switch_device(
+            device_info, coordinator.data
+        )
         self._attr_unique_id = f"{self._device_id}_{description.key}"
         self._attr_name = description.name
         self._attr_icon = description.icon
@@ -156,7 +160,11 @@ class JackeryNumberEntity(CoordinatorEntity, NumberEntity):
         key = self.entity_description.key
 
         try:
-            box_cmd = TRANSFER_SWITCH_NUMBER_COMMANDS.get(key)
+            box_cmd = (
+                TRANSFER_SWITCH_NUMBER_COMMANDS.get(key)
+                if self._is_transfer_switch
+                else None
+            )
             if box_cmd is not None:
                 action_id, cmd = box_cmd
                 await self._api.async_send_device_command(
