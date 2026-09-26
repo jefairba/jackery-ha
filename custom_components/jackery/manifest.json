@@ -1,7 +1,7 @@
 {
     "domain": "jackery",
-    "name": "Jackery",
-    "version": "1.2.0-jf.2",
+    "name": "Jackery (unofficial fork)",
+    "version": "1.2.0-jf.3",
     "documentation": "https://github.com/jefairba/jackery-ha/blob/main/README.md",
     "issue_tracker": "https://github.com/jefairba/jackery-ha#support",
     "codeowners": [

@@ -5,11 +5,13 @@
 
 > **Note:** This integration targets the **Jackery** app backend (used by portable stations like the Explorer series and Smart Transfer Switch). If your device is managed by the **Jackery Home** app (e.g. HomePower 2000 Ultra, SolarVault), that app uses a different API; see [iLLixM/jackery_home_cloud-ha](https://github.com/iLLixM/jackery_home_cloud-ha) for a community integration targeting that backend.
 
-# Jackery Home Assistant Integration
+# Jackery Home Assistant Integration (unofficial fork)
+
+Not affiliated with or endorsed by Jackery. "Jackery" is a trademark of its owner and is used here only to say which devices this works with.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![fork](https://img.shields.io/badge/personal%20fork-%40jefairba-lightgrey.svg)](https://github.com/jefairba/jackery-ha)
-[![version](https://img.shields.io/badge/version-1.2.0--jf.2-blue.svg)](https://github.com/jefairba/jackery-ha)
+[![version](https://img.shields.io/badge/version-1.2.0--jf.3-blue.svg)](https://github.com/jefairba/jackery-ha)
 
 Custom Home Assistant integration for monitoring and controlling Jackery portable power stations and the Smart Transfer Switch. Provides real-time sensors, writable controls, and automation services.
 
