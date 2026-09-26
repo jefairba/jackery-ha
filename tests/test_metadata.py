@@ -26,13 +26,11 @@ class MetadataTests(unittest.TestCase):
         """Manifest links should resolve to this repository."""
         self.assertEqual(
             self.manifest["documentation"],
-            "https://github.com/theak/jackery-homeassistant/blob/main/README.md",
+            "https://github.com/jefairba/jackery-ha/blob/main/README.md",
         )
-        self.assertEqual(
-            self.manifest["issue_tracker"],
-            "https://github.com/theak/jackery-homeassistant/issues",
-        )
-        self.assertEqual(self.manifest["codeowners"], ["@theak"])
+        # Issues are disabled on this fork, so no issue_tracker is advertised.
+        self.assertNotIn("issue_tracker", self.manifest)
+        self.assertEqual(self.manifest["codeowners"], ["@jefairba"])
 
     def test_readme_version_badge_matches_manifest(self) -> None:
         """README badge should advertise the same release as the manifest."""

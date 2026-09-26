@@ -2,9 +2,10 @@
     "domain": "jackery",
     "name": "Jackery",
     "version": "1.2.0",
-    "documentation": "https://github.com/theak/jackery-homeassistant/blob/main/README.md",
-    "issue_tracker": "https://github.com/theak/jackery-homeassistant/issues",
-    "codeowners": ["@theak"],
+    "documentation": "https://github.com/jefairba/jackery-ha/blob/main/README.md",
+    "codeowners": [
+        "@jefairba"
+    ],
     "requirements": [
         "requests>=2.31.0",
         "pycryptodomex>=3.19.0",

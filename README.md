@@ -1,12 +1,15 @@
-> This is a community-maintained project. Issue responses may be slow, but pull requests are welcome! Reasonable PRs will be reviewed, tested, and merged.
+> [!WARNING]
+> **Personal fork for one specific setup. Unsupported.** This copy is tuned for a single Explorer 5000 Plus + Smart Transfer Switch installation and may change or break without notice. Issues are disabled. **If you want this integration, use the actively maintained upstream: [turmacar/jackery-homeassistant](https://github.com/turmacar/jackery-homeassistant).**
+>
+> **Credits:** originally written by [theak](https://github.com/theak/jackery-homeassistant) (Akshay Kannan); Transfer Switch, circuit, plan and MQTT support by [turmacar](https://github.com/turmacar/jackery-homeassistant). This fork only adds local changes on top of their work. MIT licensed; see [LICENSE](LICENSE).
 
 > **Note:** This integration targets the **Jackery** app backend (used by portable stations like the Explorer series and Smart Transfer Switch). If your device is managed by the **Jackery Home** app (e.g. HomePower 2000 Ultra, SolarVault), that app uses a different API; see [iLLixM/jackery_home_cloud-ha](https://github.com/iLLixM/jackery_home_cloud-ha) for a community integration targeting that backend.
 
 # Jackery Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
-[![maintainer](https://img.shields.io/badge/maintainer-%40theak-blue.svg)](https://github.com/theak)
-[![version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/theak/jackery-homeassistant)
+[![fork](https://img.shields.io/badge/personal%20fork-%40jefairba-lightgrey.svg)](https://github.com/jefairba/jackery-ha)
+[![version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/jefairba/jackery-ha)
 
 Custom Home Assistant integration for monitoring and controlling Jackery portable power stations and the Smart Transfer Switch. Provides real-time sensors, writable controls, and automation services.
 
@@ -19,7 +22,7 @@ Custom Home Assistant integration for monitoring and controlling Jackery portabl
 - Per-circuit power monitoring with automatic split-phase pair combining
 - Custom Lovelace cards for plan and circuit management
 
-For the full entity reference, see the [Wiki](../../wiki).
+For the full entity reference, see the [wiki pages](wiki/Home.md) in this repository (upstream: [turmacar wiki](https://github.com/turmacar/jackery-homeassistant/wiki)).
 
 ## Installation
 
