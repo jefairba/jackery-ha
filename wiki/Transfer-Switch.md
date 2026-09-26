@@ -16,7 +16,7 @@ The Transfer Switch operates in one of three working modes, controlled by the **
 | Scheduled Tasks | `1` | Uses configured charge/discharge plans to control when to charge or discharge |
 | Self Consumption | `2` | Prioritizes battery and solar output; charges from the grid only when needed |
 
-Each mode has its own backup reserve percentage (the minimum battery level held in reserve for outages). The backup reserve for the currently active mode is shown in the **Backup Reserve** number entity and can be adjusted there directly.
+Each mode has its own backup reserve percentage (the minimum battery level held in reserve for outages). In this fork the reserve shown in the Jackery app is the read-only **Backup Reserve** sensor (`dt`). The writable number is named **Backup Reserve (ddt, unverified)**: on a tested Explorer 5000 Plus + Transfer Switch it read 15 while the app showed 90, so what it controls is unknown.
 
 The integration also exposes **Auto Mode Backup Reserve**, **Scheduled Mode Backup Reserve**, and **Self Consumption Mode Backup Reserve** number entities. The Jackery app doesn't provide controls for these, they're either ignored or used to set the global **Backup Reserve** value. Probably.
 

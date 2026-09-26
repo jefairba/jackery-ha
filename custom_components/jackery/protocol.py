@@ -160,10 +160,13 @@ CONTROL_SPECS: dict[str, JackeryControlSpec] = {
     # modules (TRANSFER_SWITCH_COMMANDS / _NUMBER_COMMANDS / _SELECT_COMMANDS).
     # action_id is intentionally omitted here; these never go through
     # async_set_device_property.
+    # ddt is NOT the reserve shown in the Jackery app: on an Explorer 5000
+    # Plus + Transfer Switch (2026-09-26) the app showed 90 % while ddt=15
+    # and dt=90. What writing ddt does is unknown, so the name says so.
     "ddt": JackeryControlSpec(
         key="ddt",
         slug="ddt",
-        name="Backup Reserve",
+        name="Backup Reserve (ddt, unverified)",
         platform="number",
         icon="mdi:battery-lock",
     ),

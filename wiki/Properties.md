@@ -27,7 +27,7 @@ Properties marked **MQTT only** are not included in the HTTP snapshot and requir
 | `cep` | object | Currently executing plan | HTTP | Active Plan sensor |
 | `cir` | list | Circuit list (see sub-object below) | MQTT only | Circuit sensors/switches |
 | `de` | int | Battery discharge today (Wh cumulative) | HTTP | Battery Discharge energy sensor |
-| `ddt` | int | Default/current backup reserve (%) | HTTP | Backup Reserve number |
+| `ddt` | int | Unknown. Upstream calls it the backup reserve, but it does not match the app (app 90, ddt 15) | HTTP | Backup Reserve (ddt, unverified) number |
 | `dg` | int | Grid consumption today (Wh cumulative) | HTTP | Grid Consumption energy sensor |
 | `dh` | int | House consumption today (Wh cumulative) | HTTP | House Consumption energy sensor |
 | `ds` | int | Solar generation today (Wh cumulative) | HTTP | Solar Generation energy sensor |
@@ -137,7 +137,7 @@ Properties marked **MQTT only** are not included in the HTTP snapshot and requir
 | `cs` | int | Charge speed | HTTP | Charge Speed select |
 | `dhg_recall` | int | Restore previous output state after startup (0=off, 1=on) | HTTP | Discharge Memory switch |
 | `dl` | int | Discharge limit (%) | HTTP | Discharge Limit sensor |
-| `dt` | int | Portable backup reserve (%) | HTTP | Portable Backup Reserve sensor |
+| `dt` | int | Backup reserve (%) as shown in the Jackery app (verified: app 90, dt 90) | HTTP | Backup Reserve sensor |
 | `ec` | int | Error code | HTTP | Error Code sensor |
 | `en` | int | Working mode (reported when box=1) | HTTP | Not mapped |
 | `iac` | int | Input AC connected status | HTTP | AC Input Connected binary sensor |

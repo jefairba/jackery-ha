@@ -41,7 +41,11 @@ CHARGING_PLAN_DATA = "108"
 ENTITY_HELP_TEXT: dict[str, str] = {
     # Sensors
     "rb": "Current battery charge level across all connected packs.",
-    "ddt": "Minimum battery % reserved for backup during power outages.",
+    "ddt": (
+        "UNVERIFIED: does not match the Backup Reserve shown in the Jackery app "
+        "(that is the read-only Backup Reserve sensor, dt). Do not change this "
+        "until its effect is known."
+    ),
     "bt": "Internal battery temperature.",
     "op": "Total power currently being drawn from the device.",
     "ip": "Total power input from all sources (AC, DC, solar).",
@@ -170,7 +174,7 @@ ENTITY_HELP_TEXT: dict[str, str] = {
     "odcct": "DC Car Output Countdown remaining in seconds.",
     "oact": "AC Output Countdown remaining in seconds.",
     # Portable limit sensors
-    "dt": "Portable Backup Reserve percentage.",
+    "dt": "Backup Reserve as shown in the Jackery app (verified on Explorer 5000 Plus + Transfer Switch).",
     "dl": "Discharge Limit percentage.",
     "cl": "Charge Limit percentage.",
     "bc": "Battery Cutoff percentage.",
@@ -897,7 +901,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
     # Portable limit sensors
     JackerySensorEntityDescription(
         key="dt",
-        name="Portable Backup Reserve",
+        name="Backup Reserve",
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
