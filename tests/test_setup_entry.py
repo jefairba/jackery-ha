@@ -274,6 +274,7 @@ def install_package_stubs(stubbed_modules: dict[str, object]) -> None:
     api_mod.JackeryAPI = JackeryAPI
     api_mod.JackeryAuthenticationError = JackeryAuthenticationError
     api_mod.new_android_id = lambda: "0123456789abcdef"
+    api_mod.JackerySessionYielded = type("JackerySessionYielded", (Exception,), {})
 
     _install_stub_module(stubbed_modules, f"{TEST_PACKAGE}.const", const_mod)
     _install_stub_module(stubbed_modules, f"{TEST_PACKAGE}.protocol", protocol_mod)

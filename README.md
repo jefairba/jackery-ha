@@ -11,7 +11,7 @@ Not affiliated with or endorsed by Jackery. "Jackery" is a trademark of its owne
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![fork](https://img.shields.io/badge/personal%20fork-%40jefairba-lightgrey.svg)](https://github.com/jefairba/jackery-ha)
-[![version](https://img.shields.io/badge/version-1.2.0--jf.4-blue.svg)](https://github.com/jefairba/jackery-ha)
+[![version](https://img.shields.io/badge/version-1.2.0--jf.5-blue.svg)](https://github.com/jefairba/jackery-ha)
 
 Custom Home Assistant integration for monitoring and controlling Jackery portable power stations and the Smart Transfer Switch. Provides real-time sensors, writable controls, and automation services.
 
@@ -19,10 +19,10 @@ Custom Home Assistant integration for monitoring and controlling Jackery portabl
 
 Differences from [turmacar/jackery-homeassistant](https://github.com/turmacar/jackery-homeassistant):
 
-- **Credentials stay out of logs.** Tokens, the MQTT password, user ID, Wi-Fi name, LAN IP and MAC are masked; a failed login no longer logs the request URL (which carried the password in recoverable form).
+- **Credentials stay out of logs.** Tokens, the MQTT password, user ID, Wi-Fi name, LAN IP, MAC and device serial numbers are masked; a failed login no longer logs the request URL (which carried the password in recoverable form).
 - **Network outages are not "wrong password".** If Jackery can't be reached (e.g. HA boots before the internet is back after a power cut), setup retries instead of waiting for reauthentication. A standard *Reauthenticate* screen handles real password changes.
 - **Per-install device identity** instead of one hardcoded ID shared by every install.
-- **Commands must be confirmed.** A switch/select/number only changes in HA when the device reports the new value within 10 s; otherwise HA shows *rejected* or *unconfirmed* and re-reads the real state.
+- **Commands must be confirmed.** A switch/select/number only changes in HA once the device shows the new value: from its reply within 10 s, or - for the Smart Transfer Switch, which only acknowledges - by reading its state back (up to ~6 s more). Otherwise HA says *rejected* (e.g. "acknowledged but did not apply it") or *unconfirmed*, and re-reads the real state.
 - **240V circuits are never left on one leg.** If either leg fails, both are returned to their previous state (with a loud warning if that fails too).
 - **Stale data is visible.** A *Data Stale* sensor turns on after ~2 min without fresh cloud data; entities go unavailable after ~5 min (was 15).
 - **Power-cutting controls are dropdowns, not switches.** Circuit On/Off, *UPS Mode* (Off/On), *Grid / Station* (Grid/Battery) and the Explorer's *AC Output* (Off/On, it feeds the Transfer Switch) are selects, so "turn off" voice commands, area commands ("turn off the garage"), `homeassistant.turn_off` and scenes that sweep up switches can't reach them. Force Charge stays a switch.

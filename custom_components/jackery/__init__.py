@@ -17,7 +17,12 @@ from homeassistant.helpers.update_coordinator import (
 )
 from homeassistant.util import dt as dt_util
 
-from .api import JackeryAPI, JackeryAuthenticationError, new_android_id
+from .api import (
+    JackeryAPI,
+    JackeryAuthenticationError,
+    JackerySessionYielded,
+    new_android_id,
+)
 from .const import BINARY_SENSOR_DESCRIPTIONS, CONF_ANDROID_ID, CONF_YIELD_MINUTES, DEFAULT_YIELD_MINUTES, DOMAIN, POLLING_INTERVAL_SEC, SENSOR_DESCRIPTIONS
 from .protocol import CONTROL_SPECS, is_transfer_switch_device
 
@@ -154,7 +159,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             except Exception as err:
                 _failures[0] += 1
                 if _props_cache["properties"] and _failures[0] <= MAX_HTTP_FAILURES:
-                    _LOGGER.warning(
+                    # Yielding to the phone app is deliberate: not worth a warning.
+                    _LOGGER.log(
+                        logging.INFO
+                        if isinstance(err, JackerySessionYielded)
+                        else logging.WARNING,
                         "HTTP refresh failed for %s (%d/%d), using last-known data: %s",
                         dev_id,
                         _failures[0],

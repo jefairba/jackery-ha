@@ -42,8 +42,7 @@ class RedactTests(unittest.TestCase):
         }
         redacted = api._redact(payload)
         self.assertEqual(redacted["data"]["properties"]["rb"], 86)
-        self.assertEqual(redacted["data"]["devices"][0]["devSn"], "SN1")
-        for value in ("HomeWiFi", "192.168.4.50", "aa:bb:cc:dd:ee:ff"):
+        for value in ("HomeWiFi", "192.168.4.50", "aa:bb:cc:dd:ee:ff", "SN1"):
             self.assertNotIn(value, repr(redacted))
 
     def test_does_not_mutate_input(self) -> None:

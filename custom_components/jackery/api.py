@@ -50,6 +50,11 @@ _REDACT_KEYS = frozenset(
         "wname",
         "wip",
         "mac",
+        # device and battery-pack serial numbers
+        "deviceSn",
+        "deviceCode",
+        "devSn",
+        "sn",
     }
 )
 
@@ -277,6 +282,11 @@ class JackeryMqttSession:
 # dashboard is still watching when the answer (or the error) arrives.
 COMMAND_CONFIRM_TIMEOUT_SEC = 10.0
 
+# When a device only acknowledges a command, read its state back to see if
+# the command actually took effect. Jackery's cloud copy lags the device by a
+# second or two, so check a few times (~6 s total) before calling it refused.
+READBACK_DELAYS_SEC = (1.5, 2.0, 2.5)
+
 # Body keys that are opcodes/addresses rather than commanded values.
 _NON_VALUE_KEYS = frozenset({"cmd", "idx"})
 
@@ -308,17 +318,24 @@ def _same_value(sent, reported) -> bool:
         return str(sent) == str(reported)
 
 
+def _commanded_values(sent_body: dict) -> dict:
+    return {k: v for k, v in sent_body.items() if k not in _NON_VALUE_KEYS}
+
+
+def _reply_reports_values(sent_body: dict, reply) -> bool:
+    """True if the reply echoes at least one commanded value (portables do).
+
+    The Smart Transfer Switch only acknowledges - e.g. {"cmd": 5,
+    "messageId": ...} for Force Charge (seen 2026-09-26) - so its commands are
+    confirmed by reading the device state back instead.
+    """
+    expected = _commanded_values(sent_body)
+    return isinstance(reply, dict) and bool(expected.keys() & reply.keys())
+
+
 def _verify_reply(sent_body: dict, reply) -> None:
-    """Check that a reply reports the values we commanded."""
-    expected = {k: v for k, v in sent_body.items() if k not in _NON_VALUE_KEYS}
-    if not expected:
-        return
-    if not isinstance(reply, dict) or not expected.keys() & reply.keys():
-        raise JackeryCommandUnconfirmed(
-            "device replied but did not report the new value "
-            f"(expected {sorted(expected)}, reply keys "
-            f"{sorted(reply) if isinstance(reply, dict) else type(reply).__name__})"
-        )
+    """Check that a reply that echoes values reports the ones we commanded."""
+    expected = _commanded_values(sent_body)
     mismatched = {
         k: (v, reply[k])
         for k, v in expected.items()
@@ -915,9 +932,48 @@ class JackeryAPI:
             result.get("actionId"),
             _redact(reply),
         )
-        if verify:
-            _verify_reply(body, reply)
+        if verify and _commanded_values(body):
+            if _reply_reports_values(body, reply):
+                _verify_reply(body, reply)
+            else:
+                await self._async_confirm_by_readback(device_id, body)
         return result
+
+    async def _async_confirm_by_readback(self, device_id: str, body: dict) -> None:
+        """Confirm an acknowledged command by reading the device state back."""
+        expected = _commanded_values(body)
+        reported: dict = {}
+        for delay in READBACK_DELAYS_SEC:
+            await asyncio.sleep(delay)
+            try:
+                detail = await asyncio.to_thread(self.get_device_detail, device_id)
+            except JackerySessionYielded:
+                raise
+            except Exception as err:  # noqa: BLE001 - report, don't guess
+                raise JackeryCommandUnconfirmed(
+                    "device acknowledged the command, but its state could not be "
+                    f"read back to check it ({type(err).__name__})"
+                ) from None
+            props = ((detail.get("data") or {}).get("properties")) or {}
+            missing = [k for k in expected if k not in props]
+            if missing:
+                raise JackeryCommandUnconfirmed(
+                    "device acknowledged the command, but does not report "
+                    f"{', '.join(missing)} so it can't be checked"
+                )
+            reported = {k: props[k] for k in expected}
+            if all(_same_value(v, reported[k]) for k, v in expected.items()):
+                return
+        detail = ", ".join(
+            f"{k}: sent {v}, device still reports {reported[k]}"
+            for k, v in expected.items()
+            if not _same_value(v, reported[k])
+        )
+        total = sum(READBACK_DELAYS_SEC)
+        raise JackeryCommandRejected(
+            f"device acknowledged the command but did not apply it after "
+            f"{total:.0f}s ({detail})"
+        )
 
     async def async_set_device_dp(
         self,
