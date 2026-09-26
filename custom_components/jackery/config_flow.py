@@ -1,6 +1,10 @@
 """Config flow for Jackery integration."""
 
+from __future__ import annotations
+
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -18,6 +22,8 @@ DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_PASSWORD): str,
     }
 )
+
+REAUTH_SCHEMA = vol.Schema({vol.Required(CONF_PASSWORD): str})
 
 
 async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, str]:
@@ -62,4 +68,40 @@ class JackeryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user", data_schema=DATA_SCHEMA, errors=errors
+        )
+
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]):
+        """Start reauth when the stored password stops working."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(self, user_input=None):
+        """Ask for a new password for the existing account.
+
+        Only the password is editable: the username is the entry's unique ID,
+        and keeping the same entry preserves entity IDs, history and the
+        stored device identity.
+        """
+        entry = self._get_reauth_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data = {
+                **entry.data,
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+                CONF_ANDROID_ID: entry.data.get(CONF_ANDROID_ID) or new_android_id(),
+            }
+            try:
+                await validate_input(self.hass, data)
+            except JackeryAuthenticationError:
+                errors["base"] = "invalid_auth"
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected exception during reauth")
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(entry, data=data)
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=REAUTH_SCHEMA,
+            description_placeholders={"username": entry.data[CONF_USERNAME]},
+            errors=errors,
         )

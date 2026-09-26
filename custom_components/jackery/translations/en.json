@@ -8,6 +8,13 @@
             "username": "Username (Email)",
             "password": "Password"
           }
+        },
+        "reauth_confirm": {
+          "title": "Re-enter Jackery password",
+          "description": "The saved password for {username} no longer works. Enter the current password for this Jackery account.",
+          "data": {
+            "password": "Password"
+          }
         }
       },
       "error": {
@@ -16,7 +23,8 @@
         "unknown": "An unknown error occurred. Please check the logs."
       },
       "abort": {
-        "already_configured": "This Jackery account is already configured."
+        "already_configured": "This Jackery account is already configured.",
+        "reauth_successful": "Password updated. The Jackery integration is reloading."
       }
     }
 }
