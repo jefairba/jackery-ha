@@ -247,6 +247,56 @@ class JackeryMqttSession:
                 self._pending_future = None
 
 
+# How long a command may take to be echoed back through Jackery's cloud.
+COMMAND_CONFIRM_TIMEOUT_SEC = 20.0
+
+# Body keys that are opcodes/addresses rather than commanded values.
+_NON_VALUE_KEYS = frozenset({"cmd", "idx"})
+
+
+class JackeryCommandError(Exception):
+    """A device command did not complete."""
+
+
+class JackeryCommandUnconfirmed(JackeryCommandError):
+    """No confirmation arrived in time; the command may or may not have applied."""
+
+
+class JackeryCommandRejected(JackeryCommandError):
+    """The device confirmed, but reports a value other than the one sent."""
+
+
+def _same_value(sent, reported) -> bool:
+    try:
+        return int(sent) == int(reported)
+    except (TypeError, ValueError):
+        return str(sent) == str(reported)
+
+
+def _verify_reply(sent_body: dict, reply) -> None:
+    """Check that a reply reports the values we commanded."""
+    expected = {k: v for k, v in sent_body.items() if k not in _NON_VALUE_KEYS}
+    if not expected:
+        return
+    if not isinstance(reply, dict) or not expected.keys() & reply.keys():
+        raise JackeryCommandUnconfirmed(
+            "device replied but did not report the new value "
+            f"(expected {sorted(expected)}, reply keys "
+            f"{sorted(reply) if isinstance(reply, dict) else type(reply).__name__})"
+        )
+    mismatched = {
+        k: (v, reply[k])
+        for k, v in expected.items()
+        if k in reply and not _same_value(v, reply[k])
+    }
+    if mismatched:
+        detail = ", ".join(
+            f"{k}: sent {sent}, device reports {got}"
+            for k, (sent, got) in mismatched.items()
+        )
+        raise JackeryCommandRejected(f"device kept its previous value ({detail})")
+
+
 def new_android_id() -> str:
     """Return a fresh random device ID in Android ID format (16 hex chars)."""
     return secrets.token_hex(8)
@@ -638,8 +688,22 @@ class JackeryAPI:
         action_id: int,
         body: dict,
         message_type: str = "DevicePropertyChange",
-    ) -> None:
-        """Send a raw MQTT command via the persistent Transfer Switch session."""
+        *,
+        verify: bool = True,
+    ) -> dict:
+        """Send an MQTT command and wait for the device to confirm it.
+
+        A command only counts as done when the device replies. With
+        ``verify`` (the default), the reply must also report every commanded
+        value (all body keys except the ``cmd`` opcode); a different value
+        means the device refused it. Callers whose reply cannot be matched
+        key-for-key (circuit toggles, plan CRUD) pass ``verify=False`` and
+        accept any reply for the same action.
+
+        Returns the reply. Raises JackeryCommandUnconfirmed on timeout,
+        JackeryCommandRejected on a mismatched value, and
+        JackeryCommandError if the command could not be sent at all.
+        """
         if aiomqtt is None:
             raise RuntimeError("aiomqtt is not installed")
         if self._mqtt_session is None:
@@ -666,17 +730,29 @@ class JackeryAPI:
             )
 
         try:
-            result = await self._mqtt_session.publish_and_wait(payload, _match, timeout=5.0)
-            _LOGGER.info(
-                "MQTT response: messageType=%s actionId=%s body=%s",
-                result.get("messageType"),
-                result.get("actionId"),
-                _redact(result.get("body")),
+            result = await self._mqtt_session.publish_and_wait(
+                payload, _match, timeout=COMMAND_CONFIRM_TIMEOUT_SEC
             )
         except TimeoutError:
-            _LOGGER.warning("No MQTT response within 5s for actionId=%d", action_id)
-        except Exception:
-            _LOGGER.exception("MQTT command failed for actionId=%d device=%s", action_id, device_sn)
+            raise JackeryCommandUnconfirmed(
+                f"device did not confirm within {COMMAND_CONFIRM_TIMEOUT_SEC:.0f}s; "
+                "it may or may not have applied"
+            ) from None
+        except Exception as err:
+            raise JackeryCommandError(
+                f"command could not be sent ({type(err).__name__}: {err})"
+            ) from err
+
+        reply = result.get("body")
+        _LOGGER.info(
+            "MQTT response: messageType=%s actionId=%s body=%s",
+            result.get("messageType"),
+            result.get("actionId"),
+            _redact(reply),
+        )
+        if verify:
+            _verify_reply(body, reply)
+        return result
 
     async def async_set_device_dp(
         self,
@@ -757,6 +833,7 @@ class JackeryAPI:
             14,  # actionId for UpdateElectricityStrategy
             {"cmd": 17, **plan},
             message_type="UpdateElectricityStrategy",
+            verify=False,
         )
 
     async def async_create_transfer_switch_plan(
@@ -772,6 +849,7 @@ class JackeryAPI:
             13,  # actionId for InsertElectricityStrategy
             {"cmd": 16, **plan},
             message_type="InsertElectricityStrategy",
+            verify=False,
         )
 
     async def async_delete_transfer_switch_plan(
@@ -787,6 +865,7 @@ class JackeryAPI:
             15,  # actionId for DeleteElectricityStrategy
             {"cmd": 18, "pid": pid},
             message_type="DeleteElectricityStrategy",
+            verify=False,
         )
 
     async def async_query_transfer_switch_circuits(
@@ -842,4 +921,5 @@ class JackeryAPI:
             device_sn,
             9,  # actionId for circuit switch
             {"cmd": 12, "idx": idx, "sw": 1 if on else 0},
+            verify=False,
         )

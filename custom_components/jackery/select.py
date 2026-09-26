@@ -220,6 +220,8 @@ class JackerySelectEntity(CoordinatorEntity, SelectEntity):
         except asyncio.CancelledError:
             raise
         except Exception as err:
+            # Show the device's real state now rather than at the next poll.
+            await self.coordinator.async_request_refresh()
             raise HomeAssistantError(
                 f"Failed to set {self.entity_description.name}: {err}"
             ) from err
@@ -313,6 +315,8 @@ class JackeryChargingPlanRepeatEntity(CoordinatorEntity, SelectEntity):
         except asyncio.CancelledError:
             raise
         except Exception as err:
+            # Show the device's real state now rather than at the next poll.
+            await self.coordinator.async_request_refresh()
             raise HomeAssistantError(
                 f"Failed to set {self.entity_description.name}: {err}"
             ) from err

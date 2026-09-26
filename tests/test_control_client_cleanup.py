@@ -827,7 +827,8 @@ class HttpSessionAsyncTests(unittest.IsolatedAsyncioTestCase):
         )
 
         await jackery_api.async_send_device_command(
-            "device-1", device_sn, action_id, {"cmd": 12, "idx": 1, "sw": 1}
+            "device-1", device_sn, action_id, {"cmd": 12, "idx": 1, "sw": 1},
+            verify=False,
         )
 
         self.assertEqual(len(published_payloads), 1)
