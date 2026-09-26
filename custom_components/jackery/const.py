@@ -82,7 +82,11 @@ ENTITY_HELP_TEXT: dict[str, str] = {
     "fz_ntc": "NTC temperature sensor reading is abnormal.",
     "fz_rtc": "Real-time clock module fault.",
     # Battery slot sensors (Transfer Switch)
-    "ac1_rb": "Battery level of the device connected to AC1.",
+    # rb vs trb verified 2026-09-26 on an Explorer 5000 Plus + 2 packs: the
+    # app showed 86/94/94 %, the Transfer Switch reported ac1_rb=91 (the
+    # average: combined) and ac1_trb=86 (the Explorer alone). Upstream had
+    # these two labels the other way round.
+    "ac1_rb": "Combined battery level on AC1: the portable plus all add-on packs.",
     "ac1_op": "Output power from the device connected to AC1.",
     "ac1_ip": "Input power to the device connected to AC1.",
     "ac1_ot": "Estimated remaining runtime for the device connected to AC1.",
@@ -92,8 +96,8 @@ ENTITY_HELP_TEXT: dict[str, str] = {
     "ac1_bp_count": "Number of add-on battery packs connected to the AC1 device.",
     "ac1_acpsp": "Power input from solar panels connected to the AC1 device.",
     "ac1_ss": "Solar panel input type at AC1: None, High Voltage, Low Voltage, or both.",
-    "ac1_trb": "Total remaining battery energy stored in the AC1 device.",
-    "ac2_rb": "Battery level of the device connected to AC2.",
+    "ac1_trb": "Battery level of the AC1 portable's own battery, without add-on packs.",
+    "ac2_rb": "Combined battery level on AC2: the portable plus all add-on packs.",
     "ac2_op": "Output power from the device connected to AC2.",
     "ac2_ip": "Input power to the device connected to AC2.",
     "ac2_ot": "Estimated remaining runtime for the device connected to AC2.",
@@ -103,7 +107,7 @@ ENTITY_HELP_TEXT: dict[str, str] = {
     "ac2_bp_count": "Number of add-on battery packs connected to the AC2 device.",
     "ac2_acpsp": "Power input from solar panels connected to the AC2 device.",
     "ac2_ss": "Solar panel input type at AC2: None, High Voltage, Low Voltage, or both.",
-    "ac2_trb": "Total remaining battery energy stored in the AC2 device.",
+    "ac2_trb": "Battery level of the AC2 portable's own battery, without add-on packs.",
     **{f"{slot}_pack_{i}_rb": f"Battery level of add-on pack {i} connected to {slot.upper()}." for slot in ("ac1", "ac2") for i in range(1, 6)},
     # Explorer 5000 diagnostic sensors
     "ss": "Solar panel input type: None, High Voltage, Low Voltage, or both.",
@@ -522,7 +526,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
     # Battery slot sensors (Transfer Switch ac1/ac2 flattened)
     JackerySensorEntityDescription(
         key="ac1_rb",
-        name="AC1 Battery Level",
+        name="AC1 Combined Battery",
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
@@ -587,7 +591,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
     ),
     JackerySensorEntityDescription(
         key="ac2_rb",
-        name="AC2 Battery Level",
+        name="AC2 Combined Battery",
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
@@ -673,7 +677,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
     ),
     JackerySensorEntityDescription(
         key="ac1_trb",
-        name="AC1 Total Battery",
+        name="AC1 Main Unit Battery",
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
@@ -688,7 +692,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
     ),
     JackerySensorEntityDescription(
         key="ac2_trb",
-        name="AC2 Total Battery",
+        name="AC2 Main Unit Battery",
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,

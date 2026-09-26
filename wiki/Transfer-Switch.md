@@ -89,7 +89,7 @@ The Jackery Transfer Switch does *NOT* monitor or show the physical status of th
 
 The Transfer Switch has two AC output ports (AC1 and AC2) that can each connect to a Jackery portable power station. The integration creates a set of diagnostic sensors for each connected device.
 
-Each slot includes a **Solar Type** sensor that reports None, High Voltage, Low Voltage, or High & Low Voltage. The **Total Battery** sensor reports the combined percentage across the connected station and all of its add-on battery packs.
+Each slot includes a **Solar Type** sensor that reports None, High Voltage, Low Voltage, or High & Low Voltage. The **Combined Battery** sensor (`rb`) reports the combined percentage across the connected station and all of its add-on battery packs; **Main Unit Battery** (`trb`) is the station on its own.
 
 See [Sensors - AC1 and AC2 Battery Slots](Sensors#ac1-battery-slot) for the full sensor list.
 

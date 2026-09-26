@@ -54,7 +54,7 @@ These sensors are only created for the Smart Transfer Switch.
 
 | Sensor | Description | Unit |
 |--------|-------------|------|
-| AC1 Battery Level | Battery level of device connected to AC1 | % |
+| AC1 Combined Battery | Combined level of the AC1 portable and all its add-on packs | % |
 | AC1 Battery Packs | Number of add-on battery packs on AC1 | integer |
 | AC1 Battery Status | Battery state of device on AC1 | text |
 | AC1 Connected | Whether a battery device is connected to AC1 | Yes/No |
@@ -69,7 +69,7 @@ These sensors are only created for the Smart Transfer Switch.
 
 | Sensor | Description | Unit |
 |--------|-------------|------|
-| AC2 Battery Level | Battery level of device connected to AC2 | % |
+| AC2 Combined Battery | Combined level of the AC2 portable and all its add-on packs | % |
 | AC2 Battery Packs | Number of add-on battery packs on AC2 | integer |
 | AC2 Battery Status | Battery state of device on AC2 | text |
 | AC2 Connected | Whether a battery device is connected to AC2 | Yes/No |

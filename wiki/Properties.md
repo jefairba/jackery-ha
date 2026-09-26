@@ -58,10 +58,10 @@ Properties marked **MQTT only** are not included in the HTTP snapshot and requir
 | `mc` | int | Model code | Not mapped |
 | `op` | int | Output power (W) | AC1/AC2 Output Power sensor |
 | `ot` | int | Remaining output time | AC1/AC2 Remaining Time sensor |
-| `rb` | int | Remaining battery (%) | AC1/AC2 Battery Level sensor |
+| `rb` | int | Combined battery (%) across the portable and all add-on packs | AC1/AC2 Combined Battery sensor |
 | `sn` | str | Serial number | Not mapped (device attribute) |
 | `ss` | int | Solar status (0=none, 1=high V, 2=low V, 3=both) | AC1/AC2 Solar Type sensor |
-| `trb` | int | Total battery % across station + all packs combined | AC1/AC2 Total Battery sensor |
+| `trb` | int | The portable's own battery (%), without add-on packs (verified on Explorer 5000 Plus + 2 packs; upstream documented the reverse) | AC1/AC2 Main Unit Battery sensor |
 
 ### Add-on Battery Pack Sub-Object (bp items in ac1/ac2)
 
