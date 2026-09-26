@@ -84,5 +84,20 @@ class LoginLoggingTests(unittest.TestCase):
         self.assertIsNone(ctx.exception.__cause__)
 
 
+class DeviceIdentityTests(unittest.TestCase):
+    def test_no_shared_default_identity(self) -> None:
+        a = api.JackeryAPI(account="a", password="p")
+        b = api.JackeryAPI(account="a", password="p")
+        self.assertNotEqual(a.android_id, "abcd1234567890ef")
+        self.assertNotEqual(a.android_id, b.android_id)
+        self.assertRegex(a.android_id, r"^[0-9a-f]{16}$")
+
+    def test_stable_id_gives_stable_mac_id(self) -> None:
+        a = api.JackeryAPI(account="a", password="p", android_id="feedfacecafebeef")
+        b = api.JackeryAPI(account="a", password="p", android_id="feedfacecafebeef")
+        self.assertEqual(a._mac_id, b._mac_id)
+        self.assertEqual(a._mac_id, a._generate_udid())
+
+
 if __name__ == "__main__":
     unittest.main()

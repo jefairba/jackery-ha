@@ -163,6 +163,7 @@ def install_package_stubs(stubbed_modules: dict[str, object]) -> None:
 
     const_mod = types.ModuleType(f"{TEST_PACKAGE}.const")
     const_mod.DOMAIN = "jackery"
+    const_mod.CONF_ANDROID_ID = "android_id"
     const_mod.POLLING_INTERVAL_SEC = 60
     const_mod.SENSOR_DESCRIPTIONS = ()
     const_mod.BINARY_SENSOR_DESCRIPTIONS = ()
@@ -197,9 +198,10 @@ def install_package_stubs(stubbed_modules: dict[str, object]) -> None:
         update_plan_calls: list = []
         delete_plan_calls: list = []
 
-        def __init__(self, account: str, password: str) -> None:
+        def __init__(self, account: str, password: str, android_id: str | None = None) -> None:
             self.account = account
             self.password = password
+            self.android_id = android_id
             type(self).instances.append(self)
 
         def get_device_list(self) -> dict[str, object]:
@@ -268,6 +270,7 @@ def install_package_stubs(stubbed_modules: dict[str, object]) -> None:
 
     api_mod.JackeryAPI = JackeryAPI
     api_mod.JackeryAuthenticationError = JackeryAuthenticationError
+    api_mod.new_android_id = lambda: "0123456789abcdef"
 
     _install_stub_module(stubbed_modules, f"{TEST_PACKAGE}.const", const_mod)
     _install_stub_module(stubbed_modules, f"{TEST_PACKAGE}.protocol", protocol_mod)
@@ -306,6 +309,7 @@ class AsyncSetupEntryTests(unittest.IsolatedAsyncioTestCase):
             data={},
             async_add_executor_job=AsyncMock(side_effect=lambda func, *args: func(*args)),
             config_entries=types.SimpleNamespace(
+                async_update_entry=lambda entry, data: setattr(entry, "data", data),
                 async_forward_entry_setups=AsyncMock(),
                 async_unload_platforms=AsyncMock(return_value=True),
             ),
@@ -348,6 +352,28 @@ class AsyncSetupEntryTests(unittest.IsolatedAsyncioTestCase):
             await integration.async_setup_entry(hass, entry)
 
         hass.config_entries.async_forward_entry_setups.assert_not_awaited()
+
+    async def test_setup_entry_backfills_device_identity(self) -> None:
+        """Entries created before per-install IDs get one generated and saved."""
+        hass = self._make_hass()
+        entry = self._make_entry()
+
+        await integration.async_setup_entry(hass, entry)
+
+        self.assertEqual(entry.data["android_id"], "0123456789abcdef")
+        self.assertEqual(api.JackeryAPI.instances[-1].android_id, "0123456789abcdef")
+        self.assertEqual(entry.data["username"], "user@example.com")
+
+    async def test_setup_entry_keeps_existing_device_identity(self) -> None:
+        """A stored ID must be reused, never regenerated, across restarts."""
+        hass = self._make_hass()
+        entry = self._make_entry()
+        entry.data = {**entry.data, "android_id": "feedfacecafebeef"}
+
+        await integration.async_setup_entry(hass, entry)
+
+        self.assertEqual(entry.data["android_id"], "feedfacecafebeef")
+        self.assertEqual(api.JackeryAPI.instances[-1].android_id, "feedfacecafebeef")
 
     async def test_setup_entry_succeeds_without_devices(self) -> None:
         """An empty account should stay loaded instead of failing setup outright."""
@@ -485,6 +511,7 @@ class TransferSwitchCoordinatorTests(unittest.IsolatedAsyncioTestCase):
             data={},
             async_add_executor_job=AsyncMock(side_effect=lambda func, *args: func(*args)),
             config_entries=types.SimpleNamespace(
+                async_update_entry=lambda entry, data: setattr(entry, "data", data),
                 async_forward_entry_setups=AsyncMock(),
                 async_unload_platforms=AsyncMock(return_value=True),
             ),
@@ -606,6 +633,7 @@ class PlanServiceTests(unittest.IsolatedAsyncioTestCase):
             data={},
             async_add_executor_job=AsyncMock(side_effect=lambda func, *args: func(*args)),
             config_entries=types.SimpleNamespace(
+                async_update_entry=lambda entry, data: setattr(entry, "data", data),
                 async_forward_entry_setups=AsyncMock(),
                 async_unload_platforms=AsyncMock(return_value=True),
             ),

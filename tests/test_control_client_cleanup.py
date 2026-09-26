@@ -203,6 +203,7 @@ def install_package_stubs(stubbed_modules: dict[str, object]) -> None:
 
     const_mod = types.ModuleType(f"{TEST_PACKAGE}.const")
     const_mod.DOMAIN = "jackery"
+    const_mod.CONF_ANDROID_ID = "android_id"
     const_mod.POLLING_INTERVAL_SEC = 60
     const_mod.SENSOR_DESCRIPTIONS = ()
     const_mod.BINARY_SENSOR_DESCRIPTIONS = ()

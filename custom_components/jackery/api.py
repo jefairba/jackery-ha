@@ -8,6 +8,7 @@ import hashlib
 import inspect
 import json
 import logging
+import secrets
 import threading
 import time
 import uuid
@@ -246,6 +247,11 @@ class JackeryMqttSession:
                 self._pending_future = None
 
 
+def new_android_id() -> str:
+    """Return a fresh random device ID in Android ID format (16 hex chars)."""
+    return secrets.token_hex(8)
+
+
 class JackeryAuthenticationError(Exception):
     """Exception to indicate an authentication error."""
 
@@ -254,12 +260,17 @@ class JackeryAPI:
     """A client to interact with the Jackery Cloud API."""
 
     def __init__(
-        self, account: str, password: str, android_id: str = "abcd1234567890ef"
+        self, account: str, password: str, android_id: str | None = None
     ):
-        """Initialize the API client."""
+        """Initialize the API client.
+
+        ``android_id`` is the device identity presented to Jackery (it seeds
+        the login macId and the MQTT username). Callers should pass a stable
+        per-install value; without one a random ID is used for this instance.
+        """
         self.account = account
         self.password = password
-        self.android_id = android_id
+        self.android_id = android_id or new_android_id()
         self.base_url = "https://iot.jackeryapp.com"
         self._token: Optional[str] = None
         self._token_expiry_time: float = (

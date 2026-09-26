@@ -17,8 +17,8 @@ from homeassistant.helpers.update_coordinator import (
 )
 from homeassistant.util import dt as dt_util
 
-from .api import JackeryAPI, JackeryAuthenticationError
-from .const import BINARY_SENSOR_DESCRIPTIONS, DOMAIN, POLLING_INTERVAL_SEC, SENSOR_DESCRIPTIONS
+from .api import JackeryAPI, JackeryAuthenticationError, new_android_id
+from .const import BINARY_SENSOR_DESCRIPTIONS, CONF_ANDROID_ID, DOMAIN, POLLING_INTERVAL_SEC, SENSOR_DESCRIPTIONS
 from .protocol import CONTROL_SPECS, is_transfer_switch_device
 
 PLATFORMS: list[Platform] = [
@@ -43,9 +43,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Jackery from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
+    if not entry.data.get(CONF_ANDROID_ID):
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_ANDROID_ID: new_android_id()}
+        )
+
     api = JackeryAPI(
         account=entry.data[CONF_USERNAME],
         password=entry.data[CONF_PASSWORD],
+        android_id=entry.data[CONF_ANDROID_ID],
     )
 
     try:
