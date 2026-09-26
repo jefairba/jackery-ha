@@ -57,6 +57,10 @@ ENTITY_HELP_TEXT: dict[str, str] = {
     "uo": "Device timezone offset from UTC (converted to hours).",
     "pss": "Whether power is supplied by grid or station (batteries/solar).",
     "last_updated": "Timestamp of the last successful data poll from Jackery API.",
+    "data_stale": (
+        "On when recent polls of the Jackery cloud failed and the values shown are "
+        "the last known ones. After about 5 minutes the entities become unavailable."
+    ),
     "ds": "Total solar energy generated.",
     "dh": "Total household energy consumed.",
     "de": "Total battery energy discharged.",
@@ -919,6 +923,13 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
 # - odcc: DC Car Output (for models with separate DC Car toggle)
 # - odcu: USB Output (for models with separate USB toggle)
 BINARY_SENSOR_DESCRIPTIONS: tuple[BinarySensorEntityDescription, ...] = (
+    BinarySensorEntityDescription(
+        key="data_stale",
+        name="Data Stale",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        icon="mdi:cloud-alert",
+        entity_category=None,
+    ),
     BinarySensorEntityDescription(
         key="oac",
         name="AC Output",

@@ -76,7 +76,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         | {d.key for d in BINARY_SENSOR_DESCRIPTIONS}
         | set(CONTROL_SPECS)
         | {f"{s}_pack_{i}_rb" for s in ("ac1", "ac2") for i in range(1, 6)}
-        | {"last_updated", "_plans", "_circuits"}
+        | {"last_updated", "data_stale", "_plans", "_circuits"}
     )
 
     coordinators = {}
@@ -110,7 +110,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         circuit_poll_counter = [0]
         PLAN_QUERY_EVERY_N = 5  # query plans every Nth poll (~5 min at 60s)
         CIRCUIT_QUERY_EVERY_N = 10  # query circuits every Nth poll (~10 min)
-        MAX_HTTP_FAILURES = 15  # tolerate ~15 min of blips before going unavailable
+        MAX_HTTP_FAILURES = 5  # ~5 min of last-known data before going unavailable
+        STALE_AFTER_FAILURES = 2  # ~2 min: flag data_stale so it isn't mistaken for live
 
         async def _async_update_data(
             api_client=api,
@@ -250,6 +251,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # last_updated reflects the last *successful* HTTP fetch so a stale
             # fallback is timestamped for the UI.
             properties["last_updated"] = _last_success[0] or dt_util.now()
+            # Values served from the fallback cache look identical to live
+            # ones; data_stale lets the UI and automations tell them apart.
+            properties["data_stale"] = int(_failures[0] >= STALE_AFTER_FAILURES)
             return properties
 
         # Pre-seed plan and circuit caches before first coordinator refresh
@@ -302,7 +306,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 len(reported),
                 sorted(reported),
             )
-            unknown = reported - _known_keys - {"last_updated"}
+            unknown = reported - _known_keys - {"last_updated", "data_stale"}
             if unknown:
                 _LOGGER.info(
                     "Device %s reports %d unmapped propert%s: %s - "

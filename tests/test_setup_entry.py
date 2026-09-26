@@ -416,6 +416,7 @@ class AsyncSetupEntryTests(unittest.IsolatedAsyncioTestCase):
                 "ip": 15,
                 "oac": 1,
                 "last_updated": "2026-04-18T19:00:00+01:00",
+                "data_stale": 0,
             },
         )
         self.assertEqual(raw_properties, {"rb": 42, "ip": 15, "oac": 1})
@@ -444,6 +445,16 @@ class AsyncSetupEntryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(refreshed["rb"], 42)
         self.assertEqual(refreshed["ip"], 15)
         self.assertEqual(refreshed["oac"], 1)
+        # One blip is not flagged; a second consecutive miss is.
+        self.assertEqual(refreshed["data_stale"], 0)
+        refreshed = await coordinator.update_method()
+        self.assertEqual(refreshed["data_stale"], 1)
+        self.assertEqual(refreshed["rb"], 42)
+
+        # Recovery clears the flag.
+        api.JackeryAPI.device_detail_error = None
+        refreshed = await coordinator.update_method()
+        self.assertEqual(refreshed["data_stale"], 0)
 
     async def test_coordinator_raises_after_persistent_http_failures(self) -> None:
         """Once the failure streak exceeds the tolerance, refresh should fail."""
@@ -460,8 +471,8 @@ class AsyncSetupEntryTests(unittest.IsolatedAsyncioTestCase):
         coordinator = hass.data["jackery"][entry.entry_id]["coordinators"]["device-1"]
 
         api.JackeryAPI.device_detail_error = ConnectionError("outage")
-        # Tolerate up to MAX_HTTP_FAILURES misses, then raise UpdateFailed.
-        for _ in range(15):
+        # Tolerate up to MAX_HTTP_FAILURES (5, ~5 min) misses, then raise UpdateFailed.
+        for _ in range(5):
             await coordinator.update_method()
         with self.assertRaises(integration.UpdateFailed):
             await coordinator.update_method()
@@ -549,9 +560,13 @@ class TransferSwitchCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         circuit_calls = len(api.JackeryAPI.circuits_query_calls)
 
         api.JackeryAPI.device_detail_error = ConnectionError("dns blip")
-        # Run enough polls to exceed both PLAN_QUERY_EVERY_N and CIRCUIT_QUERY_EVERY_N
+        # Run enough polls to exceed both PLAN_QUERY_EVERY_N and CIRCUIT_QUERY_EVERY_N.
+        # Past MAX_HTTP_FAILURES the poll itself fails; queries must still not run.
         for _ in range(12):
-            await coordinator.update_method()
+            try:
+                await coordinator.update_method()
+            except integration.UpdateFailed:
+                pass
 
         self.assertEqual(len(api.JackeryAPI.plans_query_calls), plan_calls)
         self.assertEqual(len(api.JackeryAPI.circuits_query_calls), circuit_calls)
