@@ -35,6 +35,48 @@ except ModuleNotFoundError as err:  # pragma: no cover - dependency provided in 
 
 _LOGGER = logging.getLogger(__name__)
 
+# Keys whose values must never reach the log: credentials, session secrets,
+# and identifiers that locate the user or their network.
+_REDACT_KEYS = frozenset(
+    {
+        "token",
+        "mqttPassWord",
+        "password",
+        "account",
+        "userId",
+        "bindUserId",
+        "macId",
+        "wname",
+        "wip",
+        "mac",
+    }
+)
+
+
+def _redact(value):
+    """Return a copy of an API payload with sensitive values masked."""
+    if isinstance(value, dict):
+        return {
+            k: "**REDACTED**" if k in _REDACT_KEYS else _redact(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact(v) for v in value]
+    return value
+
+
+def _describe_request_error(err: requests.RequestException) -> str:
+    """Describe a request failure without echoing the request URL.
+
+    requests puts the full URL (including query parameters) in its error
+    messages. For login that URL carries ``aesEncryptData``, which is the
+    password encrypted with a public, hardcoded key - i.e. recoverable.
+    """
+    response = getattr(err, "response", None)
+    if response is not None:
+        return f"{type(err).__name__} (HTTP {response.status_code})"
+    return type(err).__name__
+
 
 class JackeryMqttSession:
     """Persistent single-connection MQTT session for Jackery API.
@@ -318,7 +360,7 @@ class JackeryAPI:
             _LOGGER.debug("Login response status: %s", response.status_code)
             response.raise_for_status()
             data = response.json()
-            _LOGGER.debug("Login response data: %s", data)
+            _LOGGER.debug("Login response data: %s", _redact(data))
 
             if data.get("code") == 0 and "token" in data:
                 self._token = data["token"]
@@ -336,8 +378,10 @@ class JackeryAPI:
                 _LOGGER.error(error_msg)
                 raise JackeryAuthenticationError(data.get("msg", "Login failed"))
         except requests.RequestException as e:
-            _LOGGER.error("Login request failed: %s", e)
-            raise JackeryAuthenticationError(f"Request failed: {e}") from e
+            reason = _describe_request_error(e)
+            _LOGGER.error("Login request failed: %s", reason)
+            # "from None": the chained exception's message contains the URL.
+            raise JackeryAuthenticationError(f"Request failed: {reason}") from None
 
     def _get_request(self, url_path: str, params: Optional[dict] = None) -> dict:
         """Make a GET request to the API, handling token expiry."""
@@ -368,7 +412,7 @@ class JackeryAPI:
             _LOGGER.debug("API response status: %s", response.status_code)
             response.raise_for_status()
             data = response.json()
-            _LOGGER.debug("API response data: %s", data)
+            _LOGGER.debug("API response data: %s", _redact(data))
 
             # 10402 = token expired; 10403 = session displaced by another login
             if data.get("code") in (10402, 10403):
@@ -607,7 +651,7 @@ class JackeryAPI:
                 "MQTT response: messageType=%s actionId=%s body=%s",
                 result.get("messageType"),
                 result.get("actionId"),
-                result.get("body"),
+                _redact(result.get("body")),
             )
         except TimeoutError:
             _LOGGER.warning("No MQTT response within 5s for actionId=%d", action_id)
