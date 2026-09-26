@@ -154,6 +154,7 @@ def install_homeassistant_stubs(stubbed_modules: dict[str, object]) -> None:
 
         BATTERY = "battery"
         DURATION = "duration"
+        ENERGY = "energy"
         FREQUENCY = "frequency"
         POWER = "power"
         TEMPERATURE = "temperature"
@@ -172,6 +173,7 @@ def install_homeassistant_stubs(stubbed_modules: dict[str, object]) -> None:
 
         MEASUREMENT = "measurement"
         TOTAL = "total"
+        TOTAL_INCREASING = "total_increasing"
 
     class EntityCategory:
         """Stub entity category enum."""

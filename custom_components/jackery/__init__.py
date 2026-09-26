@@ -20,10 +20,12 @@ from homeassistant.util import dt as dt_util
 from .api import (
     JackeryAPI,
     JackeryAuthenticationError,
+    JackeryCommandError,
     JackerySessionYielded,
     new_android_id,
 )
 from .const import BINARY_SENSOR_DESCRIPTIONS, CONF_ANDROID_ID, CONF_YIELD_MINUTES, DEFAULT_YIELD_MINUTES, DOMAIN, POLLING_INTERVAL_SEC, SENSOR_DESCRIPTIONS
+from .plan_store import publish_plans
 from .protocol import CONTROL_SPECS, is_transfer_switch_device
 
 PLATFORMS: list[Platform] = [
@@ -88,6 +90,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     coordinators = {}
+    # devSn -> {"plans": [...]}, shared with publish_plans() so a confirmed
+    # plan change isn't overwritten by the next poll.
+    plan_caches: dict[str, dict] = {}
     for device in devices:
         device_id = device["devId"]
         device_name = device.get("devName", f"Jackery Device {device_id}")
@@ -107,6 +112,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Populated by MQTT query on a throttled schedule; injected into every
         # coordinator update so plan entities always have data.
         plan_cache: dict[str, list[dict]] = {"plans": []}
+        if device_sn:
+            plan_caches[device_sn] = plan_cache
         circuit_cache: dict[str, list[dict]] = {"circuits": []}
 
         # A DNS/HTTP blip should keep entities available (showing last values)
@@ -184,8 +191,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                         _counter[0] = 0
                         try:
                             plans = await api_client.async_query_transfer_switch_plans(dev_sn)
-                            # Only update cache if we got actual plan data
-                            if plans:
+                            # None = no answer (keep cache); [] = no plans.
+                            if plans is not None:
                                 _plan_cache["plans"] = plans
                         except Exception:
                             _LOGGER.debug(
@@ -273,7 +280,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if is_transfer_switch and device_sn:
             try:
                 plans = await api.async_query_transfer_switch_plans(device_sn)
-                if plans:
+                if plans is not None:
                     plan_cache["plans"] = plans
                     _LOGGER.debug("Pre-loaded %d plans for %s", len(plans), device_sn)
                 else:
@@ -346,6 +353,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "api": api,
         "coordinators": coordinators,
         "devices": devices,
+        "plan_caches": plan_caches,
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -439,26 +447,12 @@ def _register_plan_services(hass: HomeAssistant) -> None:
     """Register jackery.create_plan, jackery.update_plan, jackery.delete_plan."""
     _LOGGER.info("Registering plan CRUD services")
 
-    async def _refresh_plans_now(api: JackeryAPI, dev_sn: str) -> None:
-        """Query fresh plans from device and push into coordinator data."""
-        # Give the device time to finish processing the CRUD command
-        await asyncio.sleep(2)
+    async def _run_plan_command(coro) -> list[dict]:
+        """Await a confirmed plan command; show failures as readable errors."""
         try:
-            plans = await api.async_query_transfer_switch_plans(dev_sn)
-        except Exception:
-            _LOGGER.debug("Post-CRUD plan refresh failed for %s", dev_sn)
-            plans = None
-        if not plans:
-            _LOGGER.debug("Post-CRUD plan query returned empty for %s, keeping cached data", dev_sn)
-            return
-        for entry_data in hass.data.get(DOMAIN, {}).values():
-            if not isinstance(entry_data, dict):
-                continue
-            for coordinator in entry_data.get("coordinators", {}).values():
-                if coordinator.data and coordinator.data.get("_plans") is not None:
-                    new_data = dict(coordinator.data)
-                    new_data["_plans"] = plans
-                    coordinator.async_set_updated_data(new_data)
+            return await coro
+        except JackeryCommandError as err:
+            raise HomeAssistantError(str(err)) from err
 
     async def _handle_create_plan(call: ServiceCall) -> None:
         _LOGGER.info("create_plan service called with: %s", call.data)
@@ -475,8 +469,10 @@ def _register_plan_services(hass: HomeAssistant) -> None:
             "sw": 1 if call.data.get("enabled", True) else 0,
             "lps": call.data["days"],
         }
-        await api.async_create_transfer_switch_plan(dev_id, dev_sn, plan)
-        await _refresh_plans_now(api, dev_sn)
+        plans = await _run_plan_command(
+            api.async_create_transfer_switch_plan(dev_id, dev_sn, plan)
+        )
+        publish_plans(hass, dev_sn, plans)
 
     async def _handle_update_plan(call: ServiceCall) -> None:
         _LOGGER.info("update_plan service called with: %s", call.data)
@@ -517,15 +513,10 @@ def _register_plan_services(hass: HomeAssistant) -> None:
         if "days" in call.data:
             plan["lps"] = call.data["days"]
 
-        await api.async_update_transfer_switch_plan(dev_id, dev_sn, plan)
-
-        # Optimistic update: patch coordinator data in place
-        if coordinator is not None:
-            for p in coordinator.data.get("_plans", []):
-                if str(p.get("pid")) == str(pid):
-                    p.update(plan)
-                    break
-            coordinator.async_set_updated_data(coordinator.data)
+        plans = await _run_plan_command(
+            api.async_update_transfer_switch_plan(dev_id, dev_sn, plan)
+        )
+        publish_plans(hass, dev_sn, plans)
 
     async def _handle_delete_plan(call: ServiceCall) -> None:
         _LOGGER.info("delete_plan service called with: %s", call.data)
@@ -535,10 +526,10 @@ def _register_plan_services(hass: HomeAssistant) -> None:
         api, dev_id, dev_sn = result
         _LOGGER.info("Deleting plan %s on device %s", call.data["plan_id"], dev_sn)
 
-        await api.async_delete_transfer_switch_plan(
-            dev_id, dev_sn, call.data["plan_id"],
+        plans = await _run_plan_command(
+            api.async_delete_transfer_switch_plan(dev_id, dev_sn, call.data["plan_id"])
         )
-        await _refresh_plans_now(api, dev_sn)
+        publish_plans(hass, dev_sn, plans)
 
     hass.services.async_register(DOMAIN, "create_plan", _handle_create_plan)
     hass.services.async_register(DOMAIN, "update_plan", _handle_update_plan)

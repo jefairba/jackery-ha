@@ -451,38 +451,44 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         icon="mdi:clock",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    # Energy counters (Transfer Switch)
+    # Energy counters (Transfer Switch): cumulative Wh. device_class energy +
+    # total_increasing make them usable in HA's Energy dashboard and tolerate a
+    # counter reset (TOTAL would record a reset as a huge negative day).
     JackerySensorEntityDescription(
         key="ds",
         name="Solar Generation",
         native_unit_of_measurement="Wh",
         icon="mdi:solar-power-variant",
-        state_class=SensorStateClass.TOTAL,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=None,
     ),
     JackerySensorEntityDescription(
         key="dh",
         name="House Consumption",
         native_unit_of_measurement="Wh",
         icon="mdi:home-lightning-bolt",
-        state_class=SensorStateClass.TOTAL,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=None,
     ),
     JackerySensorEntityDescription(
         key="de",
         name="Battery Discharge",
         native_unit_of_measurement="Wh",
         icon="mdi:battery-arrow-down",
-        state_class=SensorStateClass.TOTAL,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=None,
     ),
     JackerySensorEntityDescription(
         key="dg",
         name="Grid Consumption",
         native_unit_of_measurement="Wh",
         icon="mdi:transmission-tower",
-        state_class=SensorStateClass.TOTAL,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=None,
     ),
     # Fault sub-object fields with multiple states
     JackerySensorEntityDescription(
@@ -534,7 +540,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_category=None,
     ),
     JackerySensorEntityDescription(
         key="ac1_op",
@@ -599,7 +605,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_category=None,
     ),
     JackerySensorEntityDescription(
         key="ac2_op",
@@ -685,7 +691,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_category=None,
     ),
     JackerySensorEntityDescription(
         key="ac2_ss",
@@ -700,7 +706,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_category=None,
     ),
     # Transfer Switch network diagnostics
     JackerySensorEntityDescription(
@@ -737,7 +743,7 @@ SENSOR_DESCRIPTIONS: tuple[JackerySensorEntityDescription, ...] = (
             native_unit_of_measurement=PERCENTAGE,
             device_class=SensorDeviceClass.BATTERY,
             state_class=SensorStateClass.MEASUREMENT,
-            entity_category=EntityCategory.DIAGNOSTIC,
+            entity_category=None,
         )
         for slot in ("ac1", "ac2")
         for i in range(1, 6)

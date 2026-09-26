@@ -22,6 +22,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from .api import JackeryAPI
 from .const import DOMAIN
+from .plan_store import publish_plans
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -266,7 +267,7 @@ class JackeryPlanSwitch(CoordinatorEntity, SwitchEntity):
         updated_plan["sw"] = sw
 
         try:
-            await self._api.async_update_transfer_switch_plan(
+            plans = await self._api.async_update_transfer_switch_plan(
                 self._device_id,
                 self._device_sn,
                 updated_plan,
@@ -280,9 +281,5 @@ class JackeryPlanSwitch(CoordinatorEntity, SwitchEntity):
                 f"Failed to toggle plan: {err}"
             ) from err
 
-        # Optimistic update: patch coordinator data in place
-        for p in _get_plans(self.coordinator):
-            if p.get("pid") == self._pid:
-                p["sw"] = sw
-                break
-        self.coordinator.async_set_updated_data(self.coordinator.data)
+        # The device confirmed the change: show its plan list.
+        publish_plans(self.hass, self._device_sn, plans)

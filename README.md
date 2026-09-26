@@ -11,7 +11,7 @@ Not affiliated with or endorsed by Jackery. "Jackery" is a trademark of its owne
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![fork](https://img.shields.io/badge/personal%20fork-%40jefairba-lightgrey.svg)](https://github.com/jefairba/jackery-ha)
-[![version](https://img.shields.io/badge/version-1.2.0--jf.5-blue.svg)](https://github.com/jefairba/jackery-ha)
+[![version](https://img.shields.io/badge/version-1.2.0--jf.6-blue.svg)](https://github.com/jefairba/jackery-ha)
 
 Custom Home Assistant integration for monitoring and controlling Jackery portable power stations and the Smart Transfer Switch. Provides real-time sensors, writable controls, and automation services.
 
@@ -29,6 +29,9 @@ Differences from [turmacar/jackery-homeassistant](https://github.com/turmacar/ja
 - **Sharing the one Jackery login with the phone app.** Jackery allows one sign-in per account. When the app signs in, HA now steps aside for a configurable time (default 15 min; *Configure* on the integration) instead of immediately signing the app out. A *Yielding to Jackery App* sensor and a *Reclaim Jackery Session* button live on a *Jackery Cloud Session* device.
 - **Transfer Switch commands only go to the Transfer Switch.** Upstream could send the Transfer Switch's UPS command (action 6) to an Explorer, where action 6 means DC input. Transfer Switch-only controls are no longer created on portables.
 - **Portable dropdowns work.** Light mode, charge speed and battery protection sent the option's label where the device needs its number.
+- **Plans are confirmed and shown as they really are.** Plan create/edit/delete are checked against a fresh plan list from the Transfer Switch (it only acknowledges them). "No plans" is shown as none - upstream kept the old list whenever the device reported zero plans, and a per-device cache re-inserted deleted plans on the next poll.
+- **Battery levels are regular sensors** (Combined, Main Unit, each pack), not hidden under Diagnostic.
+- **Energy counters work in HA's Energy dashboard:** Grid Consumption, House Consumption, Battery Discharge and Solar Generation are energy sensors (total_increasing, so a counter reset isn't read as a huge negative day).
 - **Battery and reserve names match the Jackery app.** *AC1 Combined Battery* / *AC1 Main Unit Battery* (upstream had them swapped); *Backup Reserve* is the app's value (`dt`), and the writable `ddt` number is labelled unverified because it doesn't match the app.
 - **"99.9 h" placeholders show as unknown** instead of a fake time estimate.
 - **Devices shared to the account are discovered** (Jackery app sharing). Whether a shared account can *control* a device is decided by Jackery and has not been verified.

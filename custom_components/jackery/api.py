@@ -1007,8 +1007,14 @@ class JackeryAPI:
     async def async_query_transfer_switch_plans(
         self,
         device_sn: str,
-    ) -> list[dict]:
-        """Query charge/discharge plans from Transfer Switch via persistent MQTT session."""
+    ) -> list[dict] | None:
+        """Query charge/discharge plans from the Transfer Switch.
+
+        Returns the device's plan list - possibly empty, which is a real
+        answer ("no plans") - or None when no answer arrived. Upstream returned
+        [] for both, so callers kept a stale cache whenever the last plan was
+        deleted.
+        """
         if aiomqtt is None:
             raise RuntimeError("aiomqtt is not installed")
         if self._mqtt_session is None:
@@ -1034,20 +1040,49 @@ class JackeryAPI:
 
         try:
             result = await self._mqtt_session.publish_and_wait(payload, _match, timeout=10.0)
-            return result["body"]["cds"]
+            cds = result["body"]["cds"]
+            return list(cds) if isinstance(cds, list) else None
         except TimeoutError:
             _LOGGER.warning("Timeout waiting for plan query response from %s", device_sn)
         except Exception:
             _LOGGER.exception("Failed to query plans for %s", device_sn)
-        return []
+        return None
+
+    async def _async_confirm_plans(
+        self, device_sn: str, applied, what: str
+    ) -> list[dict]:
+        """Re-read the plan list until ``applied(plans)`` holds; return it.
+
+        Plan commands are only acknowledged, never echoed, so like other
+        Transfer Switch commands they are confirmed by reading state back.
+        """
+        plans = None
+        answered = False
+        for delay in READBACK_DELAYS_SEC:
+            await asyncio.sleep(delay)
+            plans = await self.async_query_transfer_switch_plans(device_sn)
+            if plans is None:
+                continue
+            answered = True
+            if applied(plans):
+                return plans
+        if not answered:
+            raise JackeryCommandUnconfirmed(
+                f"{what}: the Transfer Switch acknowledged it, but its plan list "
+                "could not be read back to check"
+            )
+        raise JackeryCommandRejected(
+            f"{what}: the Transfer Switch acknowledged it, but the plan list "
+            f"did not change after {sum(READBACK_DELAYS_SEC):.0f}s"
+        )
 
     async def async_update_transfer_switch_plan(
         self,
         device_id: str,
         device_sn: str,
         plan: dict,
-    ) -> None:
-        """Update an existing charge/discharge plan on the Transfer Switch."""
+    ) -> list[dict]:
+        """Update an existing plan; returns the confirmed plan list."""
         await self.async_send_device_command(
             device_id,
             device_sn,
@@ -1056,14 +1091,26 @@ class JackeryAPI:
             message_type="UpdateElectricityStrategy",
             verify=False,
         )
+        pid = str(plan.get("pid"))
+        fields = {k: v for k, v in plan.items() if k != "pid"}
+
+        def applied(plans: list[dict]) -> bool:
+            for p in plans:
+                if str(p.get("pid")) == pid:
+                    return all(_same_value(v, p.get(k)) for k, v in fields.items())
+            return False
+
+        return await self._async_confirm_plans(device_sn, applied, f"Update plan {pid}")
 
     async def async_create_transfer_switch_plan(
         self,
         device_id: str,
         device_sn: str,
         plan: dict,
-    ) -> None:
-        """Create a new charge/discharge plan on the Transfer Switch."""
+    ) -> list[dict]:
+        """Create a plan; returns the confirmed plan list."""
+        before = await self.async_query_transfer_switch_plans(device_sn)
+        before_pids = {str(p.get("pid")) for p in before or []}
         await self.async_send_device_command(
             device_id,
             device_sn,
@@ -1072,14 +1119,24 @@ class JackeryAPI:
             message_type="InsertElectricityStrategy",
             verify=False,
         )
+        match_keys = [k for k in ("tt", "st", "et") if k in plan]
+
+        def applied(plans: list[dict]) -> bool:
+            return any(
+                str(p.get("pid")) not in before_pids
+                and all(_same_value(plan[k], p.get(k)) for k in match_keys)
+                for p in plans
+            )
+
+        return await self._async_confirm_plans(device_sn, applied, "Create plan")
 
     async def async_delete_transfer_switch_plan(
         self,
         device_id: str,
         device_sn: str,
         pid: str,
-    ) -> None:
-        """Delete a charge/discharge plan on the Transfer Switch."""
+    ) -> list[dict]:
+        """Delete a plan; returns the confirmed plan list."""
         await self.async_send_device_command(
             device_id,
             device_sn,
@@ -1088,6 +1145,11 @@ class JackeryAPI:
             message_type="DeleteElectricityStrategy",
             verify=False,
         )
+
+        def applied(plans: list[dict]) -> bool:
+            return all(str(p.get("pid")) != str(pid) for p in plans)
+
+        return await self._async_confirm_plans(device_sn, applied, f"Delete plan {pid}")
 
     async def async_query_transfer_switch_circuits(
         self,

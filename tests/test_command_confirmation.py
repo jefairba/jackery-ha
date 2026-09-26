@@ -134,5 +134,69 @@ class CommandConfirmationTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(issubclass(cls, api.JackeryCommandError))
 
 
+class PlanConfirmationTests(unittest.IsolatedAsyncioTestCase):
+    """Plan commands are only acknowledged; confirm them from the plan list."""
+
+    def setUp(self):
+        async def no_wait(_seconds):
+            return None
+
+        patcher = unittest.mock.patch.object(api.asyncio, "sleep", no_wait)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def make(self, plan_lists):
+        client = api.JackeryAPI("u", "p", android_id="feedfacecafebeef")
+        client.sent = []
+
+        async def send(device_id, device_sn, action_id, body, message_type="", *, verify=True):
+            client.sent.append((action_id, body, verify))
+            return {"body": {"cmd": body["cmd"], "messageId": 1}}
+
+        reads = list(plan_lists)
+
+        async def query(device_sn):
+            return reads.pop(0) if len(reads) > 1 else reads[0]
+
+        client.async_send_device_command = send
+        client.async_query_transfer_switch_plans = query
+        return client
+
+    P1 = {"pid": 1750886921, "tt": 1, "st": "15:00", "et": "18:00", "sw": 1, "lps": "1111111"}
+    P2 = {"pid": 1750886968, "tt": 0, "st": "00:00", "et": "05:00", "sw": 1, "lps": "1111111"}
+
+    async def test_delete_confirmed_when_plan_disappears(self):
+        client = self.make([[self.P1, self.P2], [self.P2]])
+        plans = await client.async_delete_transfer_switch_plan("d", "ts", "1750886921")
+        self.assertEqual(plans, [self.P2])
+
+    async def test_deleting_the_last_plan_confirms_with_empty_list(self):
+        client = self.make([[]])
+        self.assertEqual(await client.async_delete_transfer_switch_plan("d", "ts", "1750886968"), [])
+
+    async def test_delete_that_does_not_stick_is_rejected(self):
+        client = self.make([[self.P1, self.P2]])
+        with self.assertRaises(api.JackeryCommandRejected) as ctx:
+            await client.async_delete_transfer_switch_plan("d", "ts", "1750886921")
+        self.assertIn("plan list did not change", str(ctx.exception))
+
+    async def test_no_plan_list_answer_is_unconfirmed(self):
+        client = self.make([None])
+        with self.assertRaises(api.JackeryCommandUnconfirmed):
+            await client.async_delete_transfer_switch_plan("d", "ts", "1750886921")
+
+    async def test_create_confirmed_when_new_matching_plan_appears(self):
+        new = {"pid": "1790000000", "tt": 0, "st": "01:00", "et": "06:00", "sw": 1, "lps": 127}
+        client = self.make([[], [], [dict(new)]])
+        plans = await client.async_create_transfer_switch_plan("d", "ts", new)
+        self.assertEqual(len(plans), 1)
+
+    async def test_update_confirmed_when_fields_match(self):
+        updated = {**self.P2, "sw": 0}
+        client = self.make([[self.P2], [updated]])
+        plans = await client.async_update_transfer_switch_plan("d", "ts", updated)
+        self.assertEqual(plans[0]["sw"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
