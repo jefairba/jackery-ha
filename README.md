@@ -9,7 +9,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![fork](https://img.shields.io/badge/personal%20fork-%40jefairba-lightgrey.svg)](https://github.com/jefairba/jackery-ha)
-[![version](https://img.shields.io/badge/version-1.2.0--jf.1-blue.svg)](https://github.com/jefairba/jackery-ha)
+[![version](https://img.shields.io/badge/version-1.2.0--jf.2-blue.svg)](https://github.com/jefairba/jackery-ha)
 
 Custom Home Assistant integration for monitoring and controlling Jackery portable power stations and the Smart Transfer Switch. Provides real-time sensors, writable controls, and automation services.
 
@@ -107,6 +107,10 @@ See [Lovelace Cards](../../wiki/Lovelace-Cards) in the wiki for details on each 
 Pull requests are encouraged and welcome! For major changes, open an issue first to discuss what you would like to change.
 
 When changing `custom_components/jackery/manifest.json` version metadata, push the matching semantic version tag so HACS can install that version directly.
+
+## Support
+
+This fork is maintained for one installation and is **not supported**: issues are turned off and requests won't be answered. For bugs or features, use the upstream project, [turmacar/jackery-homeassistant](https://github.com/turmacar/jackery-homeassistant), after checking the problem also happens there.
 
 ## License
 

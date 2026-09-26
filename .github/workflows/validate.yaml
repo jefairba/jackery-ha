@@ -3,8 +3,6 @@ name: Validate
 on:
   push:
   pull_request:
-  schedule:
-    - cron: "0 0 * * *"
   workflow_dispatch:
 
 permissions: {}
@@ -17,3 +15,7 @@ jobs:
         uses: "hacs/action@main"
         with:
           category: "integration"
+          # Issues and topics are only required to join the HACS default
+          # store. This personal fork is installed as a custom repository
+          # and keeps issues off on purpose.
+          ignore: "issues topics"

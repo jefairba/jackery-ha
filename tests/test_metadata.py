@@ -28,8 +28,13 @@ class MetadataTests(unittest.TestCase):
             self.manifest["documentation"],
             "https://github.com/jefairba/jackery-ha/blob/main/README.md",
         )
-        # Issues are disabled on this fork, so no issue_tracker is advertised.
-        self.assertNotIn("issue_tracker", self.manifest)
+        # HACS requires issue_tracker; issues are off in this fork, so it points
+        # at the README's Support section, never at upstream's tracker.
+        self.assertEqual(
+            self.manifest["issue_tracker"],
+            "https://github.com/jefairba/jackery-ha#support",
+        )
+        self.assertIn("## Support", self.readme)
         self.assertEqual(self.manifest["codeowners"], ["@jefairba"])
 
     def test_readme_version_badge_matches_manifest(self) -> None:
