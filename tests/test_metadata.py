@@ -34,19 +34,21 @@ class MetadataTests(unittest.TestCase):
 
     def test_readme_version_badge_matches_manifest(self) -> None:
         """README badge should advertise the same release as the manifest."""
-        version = self.manifest["version"]
+        # shields.io static badges use "-" as a separator; a literal dash is "--".
+        version = self.manifest["version"].replace("-", "--")
         self.assertIn(
             f"https://img.shields.io/badge/version-{version}-blue.svg",
             self.readme,
         )
 
-    def test_hacs_default_branch_install_remains_enabled(self) -> None:
-        """HACS should continue to offer the default branch between releases."""
-        self.assertFalse(self.hacs["hide_default_branch"])
-        self.assertIn(
-            "HACS can also install the repository's default branch",
-            self.readme,
-        )
+    def test_fork_version_marks_upstream_base(self) -> None:
+        """Fork releases are <upstream version>-jf.<n>."""
+        self.assertRegex(self.manifest["version"], r"^\d+\.\d+\.\d+-jf\.\d+$")
+
+    def test_hacs_offers_only_tagged_releases(self) -> None:
+        """This fork pins installs to releases; HACS must hide the default branch."""
+        self.assertTrue(self.hacs["hide_default_branch"])
+        self.assertIn("default branch is hidden", self.readme)
 
     def test_repository_files_do_not_reference_fork_links(self) -> None:
         """The published metadata should not point at the temporary contributor fork."""

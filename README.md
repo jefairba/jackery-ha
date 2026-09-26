@@ -9,7 +9,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
 [![fork](https://img.shields.io/badge/personal%20fork-%40jefairba-lightgrey.svg)](https://github.com/jefairba/jackery-ha)
-[![version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/jefairba/jackery-ha)
+[![version](https://img.shields.io/badge/version-1.2.0--jf.1-blue.svg)](https://github.com/jefairba/jackery-ha)
 
 Custom Home Assistant integration for monitoring and controlling Jackery portable power stations and the Smart Transfer Switch. Provides real-time sensors, writable controls, and automation services.
 
@@ -40,19 +40,20 @@ For the full entity reference, see the [wiki pages](wiki/Home.md) in this reposi
 
 ## Installation
 
-### HACS (Recommended)
+> Reminder: this is a personal fork. Unless you are its owner, install [turmacar/jackery-homeassistant](https://github.com/turmacar/jackery-homeassistant) instead.
 
-1. Install [HACS](https://hacs.xyz/) if you have not already.
-2. Add this repository as a custom repository in HACS.
-3. Search for "Jackery" in the integrations section and click Download.
-4. Restart Home Assistant.
+### HACS
 
-HACS installs from published GitHub releases. To get unreleased fixes, HACS can also install the repository's default branch directly.
+1. In HACS, open the menu (three dots) > **Custom repositories**, add `https://github.com/jefairba/jackery-ha` with type **Integration**.
+2. Open **Jackery** in HACS and click **Download**. Pick the release to install.
+3. Restart Home Assistant, then add the integration under **Settings > Devices & services**.
+
+HACS only offers this fork's tagged releases (`vX.Y.Z-jf.N`); the default branch is hidden so untested commits are never installed. HACS never updates on its own - it shows an update when a new release is tagged, and you choose whether to install it.
 
 ### Manual
 
-1. Download or clone this repository.
-2. Copy the `jackery` folder to your `config/custom_components/` directory.
+1. Download the release zip or clone this repository at a release tag.
+2. Copy the `custom_components/jackery` folder to your `config/custom_components/` directory.
 3. Restart Home Assistant.
 
 ## Configuration
