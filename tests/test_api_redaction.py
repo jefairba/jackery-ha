@@ -76,12 +76,32 @@ class LoginLoggingTests(unittest.TestCase):
         response.raise_for_status.side_effect = error
         with mock.patch.object(api.requests, "post", return_value=response):
             with self.assertLogs(api._LOGGER, level=logging.DEBUG) as logs:
-                with self.assertRaises(api.JackeryAuthenticationError) as ctx:
+                with self.assertRaises(api.JackeryConnectionError) as ctx:
                     self._api().login()
         self.assertNotIn("ENCRYPTED", "\n".join(logs.output))
         self.assertNotIn("ENCRYPTED", str(ctx.exception))
         self.assertIn("HTTP 500", str(ctx.exception))
         self.assertIsNone(ctx.exception.__cause__)
+
+    def test_network_outage_during_login_is_not_an_auth_failure(self) -> None:
+        """No internet (e.g. HA up before the router after a power cut) must
+        be retried, not treated as a bad password that parks the entry in
+        reauth."""
+        with mock.patch.object(
+            api.requests, "post", side_effect=requests.ConnectionError("no route")
+        ):
+            with self.assertRaises(api.JackeryConnectionError):
+                self._api().login()
+        self.assertFalse(
+            issubclass(api.JackeryConnectionError, api.JackeryAuthenticationError)
+        )
+
+    def test_rejected_credentials_are_still_an_auth_failure(self) -> None:
+        response = mock.Mock(status_code=200)
+        response.json.return_value = {"code": 10001, "msg": "wrong password"}
+        with mock.patch.object(api.requests, "post", return_value=response):
+            with self.assertRaises(api.JackeryAuthenticationError):
+                self._api().login()
 
 
 class DeviceIdentityTests(unittest.TestCase):

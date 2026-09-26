@@ -253,7 +253,16 @@ def new_android_id() -> str:
 
 
 class JackeryAuthenticationError(Exception):
-    """Exception to indicate an authentication error."""
+    """Jackery rejected the credentials (reauth needed)."""
+
+
+class JackeryConnectionError(Exception):
+    """Jackery could not be reached; transient, never a reason to reauth.
+
+    Kept separate from JackeryAuthenticationError so an internet outage
+    (e.g. HA restarting after a power cut before the router is back) is
+    retried instead of parking the entry in "reauthentication required".
+    """
 
 
 class JackeryAPI:
@@ -392,7 +401,7 @@ class JackeryAPI:
             reason = _describe_request_error(e)
             _LOGGER.error("Login request failed: %s", reason)
             # "from None": the chained exception's message contains the URL.
-            raise JackeryAuthenticationError(f"Request failed: {reason}") from None
+            raise JackeryConnectionError(f"Request failed: {reason}") from None
 
     def _get_request(self, url_path: str, params: Optional[dict] = None) -> dict:
         """Make a GET request to the API, handling token expiry."""

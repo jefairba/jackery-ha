@@ -36,6 +36,10 @@ class JackeryAuthenticationError(Exception):
     pass
 
 
+class JackeryConnectionError(Exception):
+    pass
+
+
 class FakeAPI:
     accepted_password = "new-password"
     calls: list[dict] = []
@@ -45,6 +49,8 @@ class FakeAPI:
         type(self).calls.append(self.kwargs)
 
     def login(self):
+        if self.kwargs["password"] == "offline":
+            raise JackeryConnectionError("Request failed: ConnectionError")
         if self.kwargs["password"] != self.accepted_password:
             raise JackeryAuthenticationError("bad password")
         return True
@@ -72,6 +78,7 @@ def _load(stubbed: dict):
         f"{TEST_PACKAGE}.api",
         JackeryAPI=FakeAPI,
         JackeryAuthenticationError=JackeryAuthenticationError,
+        JackeryConnectionError=JackeryConnectionError,
         new_android_id=lambda: "0123456789abcdef",
     )
     stub(f"{TEST_PACKAGE}.const", DOMAIN="jackery", CONF_ANDROID_ID="android_id")
@@ -142,6 +149,11 @@ class ReauthFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["errors"], {"base": "invalid_auth"})
         self.assertFalse(hasattr(self.flow, "updated"))
         self.assertEqual(self.entry.data["password"], "old-password")
+
+    async def test_network_failure_is_not_reported_as_bad_password(self):
+        result = await self.flow.async_step_reauth_confirm({"password": "offline"})
+        self.assertEqual(result["errors"], {"base": "cannot_connect"})
+        self.assertFalse(hasattr(self.flow, "updated"))
 
 
 class TranslationTests(unittest.TestCase):

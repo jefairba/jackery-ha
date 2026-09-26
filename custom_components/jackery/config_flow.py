@@ -11,7 +11,12 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 
-from .api import JackeryAPI, JackeryAuthenticationError, new_android_id
+from .api import (
+    JackeryAPI,
+    JackeryAuthenticationError,
+    JackeryConnectionError,
+    new_android_id,
+)
 from .const import CONF_ANDROID_ID, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,6 +67,8 @@ class JackeryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_create_entry(title=info["title"], data=user_input)
             except JackeryAuthenticationError:
                 errors["base"] = "invalid_auth"
+            except JackeryConnectionError:
+                errors["base"] = "cannot_connect"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
@@ -93,6 +100,8 @@ class JackeryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await validate_input(self.hass, data)
             except JackeryAuthenticationError:
                 errors["base"] = "invalid_auth"
+            except JackeryConnectionError:
+                errors["base"] = "cannot_connect"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception during reauth")
                 errors["base"] = "unknown"
